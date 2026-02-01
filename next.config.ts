@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+    // Usando Webpack (padrão) - mais estável com Tailwind CSS v4
 };
 
 export default nextConfig;
+
