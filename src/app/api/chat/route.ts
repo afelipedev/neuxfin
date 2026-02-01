@@ -43,26 +43,26 @@ export async function POST(req: Request) {
         tools: {
             get_balance: tool({
                 description: 'Verifica o saldo financeiro atual (receitas recebidas - despesas pagas).',
-                parameters: getBalanceSchema,
+                inputSchema: getBalanceSchema,
                 execute: getBalance,
             }),
             get_recent_transactions: tool({
                 description: 'Busca as transações recentes (receitas ou despesas).',
-                parameters: getTransactionsSchema,
+                inputSchema: getTransactionsSchema,
                 execute: getRecentTransactions,
             }),
             get_upcoming_bills: tool({
                 description: 'Verifica contas e boletos a vencer nos próximos dias.',
-                parameters: getUpcomingBillsSchema,
+                inputSchema: getUpcomingBillsSchema,
                 execute: getUpcomingBills,
             }),
             add_transaction: tool({
                 description: 'Adiciona uma nova transação (receita ou despesa) no banco de dados.',
-                parameters: addTransactionSchema,
+                inputSchema: addTransactionSchema,
                 execute: addTransaction,
             }),
         },
     })
 
-    return result.toDataStreamResponse()
+    return result.toUIMessageStreamResponse()
 }

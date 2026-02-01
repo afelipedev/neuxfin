@@ -11,7 +11,20 @@ import { useChat } from '@ai-sdk/react'
 import { cn } from "@/lib/utils"
 
 export function AIChatWindow({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
-    const { messages, input, handleInputChange, handleSubmit, append, isLoading } = useChat()
+    const { messages, sendMessage, status } = useChat()
+    const [input, setInput] = React.useState('')
+    const isLoading = status === 'submitted' || status === 'streaming'
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInput(e.target.value)
+    }
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!input.trim()) return
+        sendMessage({ text: input })
+        setInput('')
+    }
     const scrollRef = React.useRef<HTMLDivElement>(null)
 
     // Scroll to bottom whenever messages change
@@ -22,7 +35,7 @@ export function AIChatWindow({ isOpen, onClose }: { isOpen: boolean, onClose: ()
     }, [messages])
 
     const handleQuickAction = (text: string) => {
-        append({ role: 'user', content: text })
+        sendMessage({ text })
     }
 
     if (!isOpen) return null
@@ -68,7 +81,9 @@ export function AIChatWindow({ isOpen, onClose }: { isOpen: boolean, onClose: ()
                                     ? "bg-brand-1 text-zinc-950 rounded-br-none border-brand-1/50"
                                     : "bg-secondary/50 text-foreground rounded-tl-none border-border"
                             )}>
-                                {m.content}
+                                {m.parts.map((part: any, i: number) => (
+                                    part.type === 'text' ? <React.Fragment key={i}>{part.text}</React.Fragment> : null
+                                ))}
                             </div>
                             <span className="text-[10px] font-black uppercase text-muted-foreground/50 px-1 tracking-widest">
                                 {m.role === 'user' ? 'Você' : 'Neux AI'}
