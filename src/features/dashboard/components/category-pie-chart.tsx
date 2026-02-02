@@ -26,6 +26,10 @@ export function CategoryPieChart({ data = [], className, height = 300 }: Categor
         )
     }
 
+    const isCompact = height < 280
+    const innerRadius = isCompact ? 45 : 60
+    const outerRadius = isCompact ? 65 : 80
+
     return (
         <div className={cn("h-full w-full", className)} style={{ minHeight: height }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -34,8 +38,8 @@ export function CategoryPieChart({ data = [], className, height = 300 }: Categor
                         data={data}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
+                        innerRadius={innerRadius}
+                        outerRadius={outerRadius}
                         paddingAngle={5}
                         dataKey="value"
                     >
@@ -62,9 +66,9 @@ export function CategoryPieChart({ data = [], className, height = 300 }: Categor
                         ]}
                     />
                     <Legend
-                        layout="vertical"
-                        align="right"
-                        verticalAlign="middle"
+                        layout="horizontal"
+                        align="center"
+                        verticalAlign="bottom"
                         formatter={(value) => (
                             <span className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground mr-4">
                                 {value}

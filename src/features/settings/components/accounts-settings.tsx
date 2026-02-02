@@ -146,13 +146,13 @@ export function AccountsSettings() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h2 className="text-xl font-bold">Contas Bancárias</h2>
                     <p className="text-sm text-muted-foreground">Gerencie seus bancos, carteiras e investimentos</p>
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <Button onClick={openCreateDialog} className="bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold">
+                    <Button onClick={openCreateDialog} className="bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold w-full sm:w-auto justify-center">
                         <Plus className="mr-2 h-4 w-4" /> Nova Conta
                     </Button>
                     <DialogContent>
@@ -170,7 +170,7 @@ export function AccountsSettings() {
                                     required
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="instituicao">Instituição (opcional)</Label>
                                     <Input
@@ -199,7 +199,7 @@ export function AccountsSettings() {
                                     </Select>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="saldo">Saldo Inicial</Label>
                                     <Input

@@ -84,8 +84,8 @@ export default function DashboardPage() {
                         <h1 className="text-4xl font-black tracking-tighter font-display text-foreground">Dashboard</h1>
                         <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-black">Visão geral da sua saúde financeira</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center bg-secondary/30 dark:bg-zinc-100/5 rounded-xl border border-border px-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
+                        <div className="flex items-center bg-secondary/30 dark:bg-zinc-100/5 rounded-xl border border-border px-2 w-full sm:w-auto">
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -118,7 +118,7 @@ export default function DashboardPage() {
                         <TransactionForm
                             type="receita"
                             trigger={
-                                <Button className="bg-brand-1 hover:bg-brand-2 text-zinc-950 shadow-xl shadow-brand-1/10 h-10 px-6 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all hover:scale-105 active:scale-95 font-display border-none">
+                                <Button className="bg-brand-1 hover:bg-brand-2 text-zinc-950 shadow-xl shadow-brand-1/10 h-10 px-6 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all hover:scale-105 active:scale-95 font-display border-none w-full sm:w-auto">
                                     <Plus className="mr-2 h-4 w-4" />
                                     Nova Transação
                                 </Button>
@@ -145,7 +145,7 @@ export default function DashboardPage() {
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="h-[400px] px-2 pb-6">
+                    <CardContent className="h-[260px] sm:h-[320px] lg:h-[400px] px-2 pb-6">
                         <CashFlowChart data={cashFlowData} loading={loadingCashFlow} />
                     </CardContent>
                 </Card>
@@ -174,10 +174,10 @@ export default function DashboardPage() {
                             <TableHeader>
                                 <TableRow className="border-none hover:bg-transparent text-muted-foreground/30">
                                     <TableHead className="font-black text-[10px] uppercase tracking-widest h-12 px-6">Descrição</TableHead>
-                                    <TableHead className="font-black text-[10px] uppercase tracking-widest h-12">Tipo</TableHead>
-                                    <TableHead className="font-black text-[11px] uppercase tracking-widest h-12">Categoria</TableHead>
+                                    <TableHead className="font-black text-[10px] uppercase tracking-widest h-12 hidden sm:table-cell">Tipo</TableHead>
+                                    <TableHead className="font-black text-[11px] uppercase tracking-widest h-12 hidden md:table-cell">Categoria</TableHead>
                                     <TableHead className="font-black text-[11px] uppercase tracking-widest h-12">Data</TableHead>
-                                    <TableHead className="font-black text-[11px] uppercase tracking-widest h-12">Status</TableHead>
+                                    <TableHead className="font-black text-[11px] uppercase tracking-widest h-12 hidden sm:table-cell">Status</TableHead>
                                     <TableHead className="font-black text-[11px] uppercase tracking-widest h-12 text-right px-6">Valor</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -192,7 +192,7 @@ export default function DashboardPage() {
                                     </TableRow>
                                 ) : transactions.map((t) => (
                                     <TableRow key={t.id} className="border-border hover:bg-brand-1/[0.04] transition-all group cursor-pointer active:bg-brand-1/[0.08]">
-                                        <TableCell className="font-medium px-6 py-5 flex items-center gap-4">
+                                        <TableCell className="font-medium px-6 py-5 flex items-center gap-4 whitespace-normal">
                                             <div className={cn(
                                                 "h-10 w-10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all duration-300",
                                                 t.tipo_transacao === 'receita' ? "bg-brand-2/10 text-brand-2" : "bg-rose-500/10 text-rose-500"
@@ -204,12 +204,12 @@ export default function DashboardPage() {
                                                 <span className="text-[10px] text-muted-foreground/50 uppercase font-black tracking-widest italic tracking-tighter">{(t as any).categoria?.nome || 'Geral'}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell><span className="bg-secondary text-muted-foreground border border-border px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter">{t.tipo_transacao}</span></TableCell>
-                                        <TableCell className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-tighter font-body">{(t as any).categoria?.nome || '-'}</TableCell>
+                                        <TableCell className="hidden sm:table-cell"><span className="bg-secondary text-muted-foreground border border-border px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter">{t.tipo_transacao}</span></TableCell>
+                                        <TableCell className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-tighter font-body hidden md:table-cell">{(t as any).categoria?.nome || '-'}</TableCell>
                                         <TableCell className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-tighter font-body">
                                             {format(parseLocalDate(t.data_vencimento), 'dd MMM yyyy', { locale: ptBR }).toUpperCase()}
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="hidden sm:table-cell">
                                             <span className={cn(
                                                 "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest",
                                                 t.status === 'liquidado' ? "bg-brand-1/10 text-brand-1" : "bg-amber-500/10 text-amber-500"
@@ -282,7 +282,7 @@ export default function DashboardPage() {
             <div className="lg:col-span-4 space-y-8">
                 <div className="space-y-4">
                     <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Ações Rápidas</h4>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <TransactionForm
                             type="receita"
                             trigger={

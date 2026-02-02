@@ -187,7 +187,7 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[900px] max-h-[85vh] p-0 overflow-hidden border-none glass-card shadow-2xl">
+            <DialogContent className="w-[95vw] sm:max-w-[900px] max-h-[85vh] p-0 overflow-hidden border-none glass-card shadow-2xl">
                 <DialogHeader className="p-4 pb-2">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -241,7 +241,7 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-1.5 mb-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2">
                                     {/* Receitas do Mês */}
                                     <div className="bg-brand-2/5 border border-brand-2/20 rounded-md p-2 hover:bg-brand-2/10 transition-all cursor-pointer group" onClick={() => insertValue(stats.total_receitas)}>
                                         <div className="flex items-center gap-1 mb-1">
@@ -448,7 +448,7 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                             </div>
 
                             {/* Filtros */}
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <Select value={filterCategory} onValueChange={setFilterCategory}>
                                     <SelectTrigger className="h-12 rounded-xl border-border bg-secondary/50">
                                         <SelectValue placeholder="Todas categorias" />
@@ -496,8 +496,8 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                             </div>
 
                             {/* Controles de Seleção */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <div className="flex items-center gap-4 flex-wrap">
                                     <Button
                                         variant="ghost"
                                         size="sm"

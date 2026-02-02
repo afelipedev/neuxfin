@@ -114,7 +114,7 @@ export default function DespesasPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Gestão de Despesas</h1>
                     <p className="text-sm text-muted-foreground">Controle suas saídas, custos fixos e variáveis</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
                     <Select
                         value={`${selectedYear}-${selectedMonth}`}
                         onValueChange={(value) => {
@@ -124,7 +124,7 @@ export default function DespesasPage() {
                             setCurrentPage(1)
                         }}
                     >
-                        <SelectTrigger className="w-[180px] bg-zinc-900/5 dark:bg-zinc-100/5 border-none">
+                        <SelectTrigger className="w-full sm:w-[180px] bg-zinc-900/5 dark:bg-zinc-100/5 border-none">
                             <Calendar className="mr-2 h-4 w-4" />
                             <SelectValue />
                         </SelectTrigger>
@@ -235,11 +235,11 @@ export default function DespesasPage() {
 
             {/* Tabela de Transações */}
             <Card className="border-none bg-zinc-900/5 dark:bg-zinc-100/5 shadow-none overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between border-b border-neux-1/5 px-6 py-4">
-                    <div className="flex items-center gap-4 flex-wrap">
+                <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-neux-1/5 px-6 py-4">
+                    <div className="flex items-center gap-4 flex-wrap w-full">
                         <div className="flex items-center gap-2">
                             <Select value={tipoFilter} onValueChange={(value: any) => { setTipoFilter(value); setCurrentPage(1); }}>
-                                <SelectTrigger className="w-[140px] h-8 text-xs border-none bg-zinc-900/5 dark:bg-zinc-100/10">
+                                <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs border-none bg-zinc-900/5 dark:bg-zinc-100/10">
                                     <SelectValue placeholder="Tipo (PF/PJ)" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -250,7 +250,7 @@ export default function DespesasPage() {
                             </Select>
 
                             <Select value={statusFilter} onValueChange={(value: any) => { setStatusFilter(value); setCurrentPage(1); }}>
-                                <SelectTrigger className="w-[140px] h-8 text-xs border-none bg-zinc-900/5 dark:bg-zinc-100/10">
+                                <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs border-none bg-zinc-900/5 dark:bg-zinc-100/10">
                                     <SelectValue placeholder="Status" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -262,7 +262,7 @@ export default function DespesasPage() {
                             </Select>
 
                             <Select value={categoriaFilter} onValueChange={(value) => { setCategoriaFilter(value); setCurrentPage(1); }}>
-                                <SelectTrigger className="w-[140px] h-8 text-xs border-none bg-zinc-900/5 dark:bg-zinc-100/10">
+                                <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs border-none bg-zinc-900/5 dark:bg-zinc-100/10">
                                     <SelectValue placeholder="Categoria" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -277,7 +277,7 @@ export default function DespesasPage() {
                         </div>
                         <ReplicateDialog transactions={transactions} onSuccess={refresh} />
                     </div>
-                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground w-full sm:w-auto justify-center">
                         <Download className="mr-2 h-4 w-4" /> Exportar Planilha
                     </Button>
                 </CardHeader>
@@ -288,10 +288,10 @@ export default function DespesasPage() {
                                 <TableHead className="font-medium text-xs h-10 px-6 cursor-pointer hover:text-foreground transition-colors" onClick={() => toggleSort('descricao')}>
                                     <div className="flex items-center">Descrição {getSortIcon('descricao')}</div>
                                 </TableHead>
-                                <TableHead className="font-medium text-xs h-10 cursor-pointer hover:text-foreground transition-colors" onClick={() => toggleSort('tipo')}>
+                                <TableHead className="font-medium text-xs h-10 cursor-pointer hover:text-foreground transition-colors hidden md:table-cell" onClick={() => toggleSort('tipo')}>
                                     <div className="flex items-center">Perfil {getSortIcon('tipo')}</div>
                                 </TableHead>
-                                <TableHead className="font-medium text-xs h-10">Categoria</TableHead>
+                                <TableHead className="font-medium text-xs h-10 hidden md:table-cell">Categoria</TableHead>
                                 <TableHead className="font-medium text-xs h-10 cursor-pointer hover:text-foreground transition-colors" onClick={() => toggleSort('data_vencimento')}>
                                     <div className="flex items-center">Vencimento {getSortIcon('data_vencimento')}</div>
                                 </TableHead>
@@ -332,7 +332,7 @@ export default function DespesasPage() {
                                                 </span>
                                             )}
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="hidden md:table-cell">
                                             <Badge className={`${transaction.tipo === 'PJ'
                                                 ? 'bg-orange-600/10 text-orange-600 dark:text-orange-400'
                                                 : 'bg-blue-600/10 text-blue-600 dark:text-blue-400'
@@ -340,7 +340,7 @@ export default function DespesasPage() {
                                                 {transaction.tipo}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-xs text-muted-foreground">
+                                        <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
                                             {transaction.categoria?.nome || '-'}
                                         </TableCell>
                                         <TableCell className="text-xs text-muted-foreground">
@@ -379,7 +379,7 @@ export default function DespesasPage() {
                             >
                                 <ChevronLeft className="h-4 w-4" />
                             </Button>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 overflow-x-auto max-w-[60vw] sm:max-w-none">
                                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                                     <Button
                                         key={page}

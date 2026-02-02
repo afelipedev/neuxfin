@@ -16,30 +16,39 @@ npm run lint     # Run ESLint
 
 ### Tech Stack
 - **UI**: shadcn/ui (new-york style) with Radix primitives, Tailwind CSS 4
-- **Backend**: Supabase (client in `src/lib/supabase.ts`)
+- **Backend**: Supabase (`src/lib/supabase/client.ts` for browser, `src/lib/supabase/server.ts` for server)
+- **AI**: Vercel AI SDK with OpenAI gpt-4o-mini for AI chat agent
 - **Charts**: Recharts
 - **Forms**: react-hook-form + Zod validation
 
 ### Project Structure
 - `src/app/` - Next.js App Router pages
-  - `(dashboard)/` - Route group for authenticated dashboard views (receitas, despesas, cofrinhos, assinaturas, relatórios)
-- `src/features/` - Feature-based modules containing domain components
-  - `dashboard/` - Summary cards, sidebar, charts
-  - `transactions/` - Transaction forms
-  - `ai-chat/` - Floating AI chat window
-  - `calculator/` - Intelligent calculator (Ctrl+K shortcut)
+  - `(auth)/` - Login and registration pages
+  - `(dashboard)/` - Authenticated dashboard views (receitas, despesas, cofrinhos, assinaturas, relatórios, configuracoes)
+  - `api/chat/` - AI chat streaming endpoint with tool-calling (get_balance, get_recent_transactions, add_transaction)
+- `src/features/` - Feature-based modules with components, hooks, services, and context
+  - `transactions/` - Transaction CRUD, services (`transactions.ts`), hooks (`use-transactions.ts`), and `TransactionContext` for cross-component state sync
+  - `ai-chat/` - Chat window + `tools/finance-tools.ts` (AI tool implementations with Zod schemas)
+  - `calculator/` - Intelligent calculator with data selector (Ctrl+K shortcut)
 - `src/components/ui/` - shadcn/ui primitives (do not modify directly; use `npx shadcn@latest add`)
-- `src/lib/` - Utilities (`cn` helper, Supabase client)
-- `src/hooks/` - Custom React hooks
+- `src/lib/utils.ts` - `cn()` helper, `parseLocalDate()`, `formatDateToISO()` for timezone-safe date handling
+
+### Data Model
+Database table: `transacoes` with foreign keys to `categorias`, `contas`, `cartoes`
+- **Transaction types**: `tipo_transacao` = 'receita' | 'despesa'
+- **Account types**: `tipo` = 'PF' (Pessoa Física) | 'PJ' (Pessoa Jurídica)
+- **Status**: 'liquidado' | 'pendente' | 'atrasado'
+- Supports installments (`parcela_atual`, `total_parcelas`, `transacao_pai_id`)
 
 ### Conventions
 - Path alias: `@/*` maps to `src/*`
-- UI colors use `neux-1`, `neux-2`, `neux-3` custom theme tokens
+- UI colors use `brand-1`, `brand-2`, `brand-3` theme tokens (CSS variables)
 - Portuguese language for user-facing strings
-- PF (Pessoa Física) / PJ (Pessoa Jurídica) distinction for transaction types
+- Use `parseLocalDate()` and `formatDateToISO()` from `@/lib/utils` to avoid timezone issues with dates
 
 ### Environment Variables
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
+OPENAI_API_KEY          # For AI chat
 ```

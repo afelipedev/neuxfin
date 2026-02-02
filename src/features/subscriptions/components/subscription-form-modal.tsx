@@ -257,7 +257,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                             )}
                         />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="valor"
@@ -297,7 +297,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="data_vencimento_dia"
@@ -420,14 +420,14 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                             )}
                         />
 
-                        <div className="flex justify-end gap-3 pt-4">
-                            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+                        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
+                            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading} className="w-full sm:w-auto">
                                 Cancelar
                             </Button>
                             <Button
                                 type="submit"
                                 disabled={loading}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
                             >
                                 {loading ? 'Salvando...' : (isEditing ? 'Atualizar' : 'Criar Assinatura')}
                             </Button>

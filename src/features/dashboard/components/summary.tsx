@@ -202,7 +202,7 @@ export function QuickActions({ onAddReceita, onAddDespesa }: { onAddReceita?: ()
     return (
         <div className="space-y-4">
             <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Ações Rápidas</h4>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Button
                     variant="outline"
                     onClick={onAddReceita}

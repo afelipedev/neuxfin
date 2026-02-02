@@ -44,7 +44,7 @@ export default function DashboardLayout({
                 <div className="flex min-h-screen w-full bg-background font-body transition-colors duration-300">
                     <DashboardSidebar />
                     <main className="flex-1 overflow-y-auto relative">
-                        <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border bg-background/50 px-6 backdrop-blur-xl justify-between">
+                        <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border bg-background/50 px-4 sm:px-6 backdrop-blur-xl justify-between">
                             <div className="flex items-center gap-4">
                                 <SidebarTrigger className="-ml-1 hover:text-brand-1 transition-colors" />
                                 <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-zinc-900/5 dark:bg-zinc-100/5 border border-border min-w-[320px] focus-within:border-brand-1/50 focus-within:bg-brand-1/5 transition-all group">
@@ -76,7 +76,7 @@ export default function DashboardLayout({
                             </div>
                         </header>
 
-                        <div key={pathname} className="p-6 md:p-12 max-w-[1600px] mx-auto page-transition">
+                        <div key={pathname} className="p-4 sm:p-6 md:p-12 max-w-[1600px] mx-auto page-transition">
                             {children}
                         </div>
 
@@ -84,9 +84,9 @@ export default function DashboardLayout({
                         <Button
                             size="icon"
                             onClick={() => setIsChatOpen(!isChatOpen)}
-                            className="fixed bottom-8 right-8 h-16 w-16 rounded-[2rem] bg-brand-1 hover:bg-brand-2 text-zinc-950 shadow-2xl shadow-brand-1/20 transition-all hover:scale-110 active:scale-95 z-50 group border-none glow-primary"
+                            className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-8 h-12 w-12 sm:h-14 sm:w-14 lg:h-16 lg:w-16 rounded-[2rem] bg-brand-1 hover:bg-brand-2 text-zinc-950 shadow-2xl shadow-brand-1/20 transition-all hover:scale-110 active:scale-95 z-50 group border-none glow-primary"
                         >
-                            <MessageSquare className="h-7 w-7 group-hover:rotate-12 transition-transform" />
+                            <MessageSquare className="h-6 w-6 sm:h-6 sm:w-6 lg:h-7 lg:w-7 group-hover:rotate-12 transition-transform" />
                         </Button>
 
                         <AIChatWindow isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />

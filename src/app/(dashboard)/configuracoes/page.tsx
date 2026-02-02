@@ -16,24 +16,26 @@ export default function SettingsPage() {
             </div>
 
             <Tabs defaultValue="categorias" className="space-y-6">
-                <TabsList className="bg-zinc-900/5 dark:bg-zinc-100/5 border-none p-1 h-12">
-                    <TabsTrigger value="categorias" className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-6 transition-all">
+                <div className="-mx-2 px-2 overflow-x-auto">
+                    <TabsList className="bg-zinc-900/5 dark:bg-zinc-100/5 border-none p-1 h-12 min-w-max">
+                        <TabsTrigger value="categorias" className="flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 sm:px-6 transition-all">
                         <Tag className="mr-2 h-4 w-4" />
                         Categorias
                     </TabsTrigger>
-                    <TabsTrigger value="contas" className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-6 transition-all">
+                        <TabsTrigger value="contas" className="flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 sm:px-6 transition-all">
                         <Landmark className="mr-2 h-4 w-4" />
                         Contas Bancárias
                     </TabsTrigger>
-                    <TabsTrigger value="cartoes" className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-6 transition-all">
+                        <TabsTrigger value="cartoes" className="flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 sm:px-6 transition-all">
                         <CreditCard className="mr-2 h-4 w-4" />
                         Cartões de Crédito
                     </TabsTrigger>
-                    <TabsTrigger value="perfil" className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-6 transition-all">
+                        <TabsTrigger value="perfil" className="flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 sm:px-6 transition-all">
                         <User className="mr-2 h-4 w-4" />
                         Perfil
                     </TabsTrigger>
-                </TabsList>
+                    </TabsList>
+                </div>
 
                 <TabsContent value="categorias" className="border-none p-0 outline-none">
                     <CategoriesSettings />

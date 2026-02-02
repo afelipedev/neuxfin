@@ -15,12 +15,12 @@ export default function RelatoriosPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Análise de Saúde Financeira</h1>
                     <p className="text-sm text-muted-foreground">Insights profundos e recomendações personalizadas por IA</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <Button variant="outline" size="sm" className="bg-zinc-900/5 dark:bg-zinc-100/5 border-none">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
+                    <Button variant="outline" size="sm" className="bg-zinc-900/5 dark:bg-zinc-100/5 border-none w-full sm:w-auto justify-center">
                         <Calendar className="mr-2 h-4 w-4" />
                         Últimos 6 Meses
                     </Button>
-                    <Button className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/20">
+                    <Button className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/20 w-full sm:w-auto justify-center">
                         <Sparkles className="mr-2 h-4 w-4" />
                         Nova Análise IA
                     </Button>
@@ -96,7 +96,7 @@ export default function RelatoriosPage() {
                         <CardTitle className="text-base font-bold">Distribuição de Gastos</CardTitle>
                         <CardDescription>Onde você mais investe seu capital</CardDescription>
                     </CardHeader>
-                    <CardContent className="h-[350px]">
+                    <CardContent className="h-[260px] sm:h-[320px] lg:h-[350px]">
                         <CategoryPieChart />
                     </CardContent>
                 </Card>
@@ -112,7 +112,7 @@ export default function RelatoriosPage() {
                             <div className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-orange-600" /> Jurídica</div>
                         </div>
                     </CardHeader>
-                    <CardContent className="h-[350px]">
+                    <CardContent className="h-[260px] sm:h-[320px] lg:h-[350px]">
                         <CashFlowChart />
                     </CardContent>
                 </Card>

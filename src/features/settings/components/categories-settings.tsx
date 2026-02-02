@@ -135,13 +135,13 @@ export function CategoriesSettings() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h2 className="text-xl font-bold">Gerenciar Categorias</h2>
                     <p className="text-sm text-muted-foreground">Adicione ou remova categorias para suas transações</p>
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <Button onClick={openCreateDialog} className="bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold">
+                    <Button onClick={openCreateDialog} className="bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold w-full sm:w-auto justify-center">
                         <Plus className="mr-2 h-4 w-4" /> Nova Categoria
                     </Button>
                     <DialogContent>

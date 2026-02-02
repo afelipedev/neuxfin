@@ -179,7 +179,7 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
                             )}
                         />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="valor"
@@ -244,7 +244,7 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
                             )}
                         />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="tipo_perfil"
@@ -381,14 +381,19 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
                             )}
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-4">
-                            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+                        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
+                            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading} className="w-full sm:w-auto">
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={loading} className={cn(
-                                "text-white",
-                                type === "receita" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
-                            )}>
+                            <Button
+                                type="submit"
+                                disabled={loading}
+                                className={cn(
+                                    "text-white",
+                                    type === "receita" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700",
+                                    "w-full sm:w-auto"
+                                )}
+                            >
                                 {loading ? 'Salvando...' : 'Salvar'}
                             </Button>
                         </div>

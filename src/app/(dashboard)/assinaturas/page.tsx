@@ -90,7 +90,7 @@ export default function AssinaturasPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Assinaturas e Recorrência</h1>
                     <p className="text-sm text-muted-foreground">Gerencie seus serviços, ferramentas e custos fixos mensais</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
                     <Button
                         variant="outline"
                         size="sm"
@@ -184,7 +184,7 @@ export default function AssinaturasPage() {
 
             {/* Tabela de Assinaturas */}
             <Card className="border-none bg-zinc-900/5 dark:bg-zinc-100/5 shadow-none overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between border-b border-neux-1/5 px-6 py-4">
+                <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-neux-1/5 px-6 py-4">
                     <CardTitle className="text-sm font-semibold text-muted-foreground">Catálogo de Serviços Recorrentes</CardTitle>
                     <div className="flex gap-2">
                         <Button
@@ -231,9 +231,9 @@ export default function AssinaturasPage() {
                             <TableHeader>
                                 <TableRow className="border-none hover:bg-transparent text-muted-foreground">
                                     <TableHead className="font-medium text-xs h-10 px-6">Serviço / Ferramenta</TableHead>
-                                    <TableHead className="font-medium text-xs h-10">Frequência</TableHead>
-                                    <TableHead className="font-medium text-xs h-10">Próximo Pagto</TableHead>
-                                    <TableHead className="font-medium text-xs h-10">Cartão</TableHead>
+                                    <TableHead className="font-medium text-xs h-10 hidden sm:table-cell">Frequência</TableHead>
+                                    <TableHead className="font-medium text-xs h-10 hidden md:table-cell">Próximo Pagto</TableHead>
+                                    <TableHead className="font-medium text-xs h-10 hidden md:table-cell">Cartão</TableHead>
                                     <TableHead className="font-medium text-xs h-10">Status</TableHead>
                                     <TableHead className="font-medium text-xs h-10 text-right px-6">Valor</TableHead>
                                     <TableHead className="font-medium text-xs h-10 text-right px-6">Ações</TableHead>
@@ -284,15 +284,15 @@ function SubscriptionRow({ subscription, onRefresh }: { subscription: Subscripti
                     </div>
                 </div>
             </TableCell>
-            <TableCell>
+            <TableCell className="hidden sm:table-cell">
                 <Badge variant="outline" className="border-none bg-zinc-200 dark:bg-zinc-800 text-[10px]">
                     {frequenciaLabel}
                 </Badge>
             </TableCell>
-            <TableCell className="text-xs text-muted-foreground">
+            <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
                 Todo dia {subscription.data_vencimento_dia || 1}
             </TableCell>
-            <TableCell>
+            <TableCell className="hidden md:table-cell">
                 {subscription.cartao ? (
                     <div className="flex items-center gap-2">
                         <CreditCard className="h-3 w-3 text-muted-foreground" />
