@@ -17,6 +17,28 @@ interface CategoryPieChartProps {
 
 const DEFAULT_COLORS = ["#26c8a6", "#45d6bc", "#64e4d3", "#83f1e9", "#a2ffff", "#fb7185", "#f43f5e", "#e11d48"]
 
+function ScrollableLegend({ payload }: { payload?: any[] }) {
+    if (!payload || payload.length === 0) return null
+
+    return (
+        <div className="mt-2 max-h-[72px] overflow-y-auto custom-scrollbar px-1">
+            <ul className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+                {payload.map((entry, idx) => (
+                    <li key={`${entry?.value ?? 'item'}-${idx}`} className="flex items-center gap-1.5">
+                        <span
+                            className="h-2 w-2 rounded-full shrink-0"
+                            style={{ backgroundColor: entry?.color }}
+                        />
+                        <span className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground">
+                            {entry?.value}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    )
+}
+
 export function CategoryPieChart({ data = [], className, height = 300 }: CategoryPieChartProps) {
     if (!data || data.length === 0) {
         return (
@@ -31,7 +53,7 @@ export function CategoryPieChart({ data = [], className, height = 300 }: Categor
     const outerRadius = isCompact ? 65 : 80
 
     return (
-        <div className={cn("h-full w-full", className)} style={{ minHeight: height }}>
+        <div className={cn("w-full", className)} style={{ height }}>
             <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                     <Pie
@@ -69,11 +91,7 @@ export function CategoryPieChart({ data = [], className, height = 300 }: Categor
                         layout="horizontal"
                         align="center"
                         verticalAlign="bottom"
-                        formatter={(value) => (
-                            <span className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground mr-4">
-                                {value}
-                            </span>
-                        )}
+                        content={<ScrollableLegend />}
                     />
                 </PieChart>
             </ResponsiveContainer>

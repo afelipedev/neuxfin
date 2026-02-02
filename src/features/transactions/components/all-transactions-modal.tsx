@@ -58,6 +58,7 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
     const [nature, setNature] = React.useState<'todos' | 'receita' | 'despesa'>('todos')
     const [category, setCategory] = React.useState<string>('todos')
     const [page, setPage] = React.useState(1)
+    const pageSize = 5
 
     const filters = React.useMemo(() => ({
         month,
@@ -66,9 +67,9 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
         tipo_transacao: nature === 'todos' ? undefined : nature,
         categoria_id: category === 'todos' ? undefined : category,
         page,
-        pageSize: 10,
+        pageSize,
         sortOrder: 'desc' as const
-    }), [month, year, type, nature, category, page])
+    }), [month, year, type, nature, category, page, pageSize])
 
     const { transactions, totalCount, loading } = useTransactions(filters)
     const { categories } = useCategories()
@@ -98,7 +99,16 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
         }
     }, [allTransactions])
 
-    const totalPages = Math.ceil(totalCount / 10)
+    const totalPages = Math.ceil(totalCount / pageSize)
+    const startItem = (page - 1) * pageSize + 1
+    const endItem = Math.min(page * pageSize, totalCount)
+    const pageNumbers = React.useMemo(() => {
+        if (totalPages <= 1) return [1]
+        const maxButtons = 5
+        const start = Math.max(1, Math.min(page - 2, totalPages - (maxButtons - 1)))
+        const end = Math.min(totalPages, start + (maxButtons - 1))
+        return Array.from({ length: end - start + 1 }, (_, i) => start + i)
+    }, [page, totalPages])
 
     const handleExport = async () => {
         const XLSX = await import('xlsx')
@@ -234,11 +244,11 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
                 </div>
 
                 {/* Main Content Area - Scrollable */}
-                <div className="flex-1 min-h-0 overflow-hidden px-6 md:px-8 pb-8">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
+                <div className="flex-1 min-h-0 overflow-y-auto px-6 md:px-8 pb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                         {/* Visualization */}
-                        <div className="md:col-span-4 lg:col-span-4 h-full">
-                            <Card className="border-none bg-zinc-950/20 rounded-[2rem] overflow-hidden shadow-2xl h-full">
+                        <div className="md:col-span-4 lg:col-span-4 min-h-0">
+                            <Card className="border-none bg-zinc-950/20 rounded-[2rem] overflow-hidden shadow-2xl">
                                 <CardContent className="p-6">
                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-6 flex items-center justify-between">
                                         <span className="flex items-center gap-2">
@@ -270,8 +280,8 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
                         </div>
 
                         {/* List */}
-                        <div className="md:col-span-8 lg:col-span-8 h-full">
-                            <Card className="border-none bg-zinc-950/10 rounded-[2.5rem] overflow-hidden shadow-xl h-full flex flex-col">
+                        <div className="md:col-span-8 lg:col-span-8 min-h-0">
+                            <Card className="border-none bg-zinc-950/10 rounded-[2.5rem] overflow-hidden shadow-xl flex flex-col">
                                 <div className="p-6 pb-2 shrink-0 flex items-center justify-between">
                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                                         <TableIcon className="h-3 w-3 text-brand-1" /> Transações Recentes
@@ -295,7 +305,7 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
                                             </TableHeader>
                                             <TableBody>
                                                 {loading ? (
-                                                    Array.from({ length: 15 }).map((_, i) => (
+                                                    Array.from({ length: pageSize }).map((_, i) => (
                                                         <TableRow key={i} className="border-none">
                                                             <TableCell colSpan={4} className="h-12 border-none px-6">
                                                                 <div className="h-4 w-full bg-white/5 animate-pulse rounded-full" />
@@ -343,12 +353,12 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
                                     </div>
 
                                     {/* Pagination - Fixed at bottom of the card */}
-                                    {!loading && totalCount > 10 && (
+                                    {!loading && totalCount > pageSize && (
                                         <div className="flex items-center justify-between px-6 py-4 border-t border-white/5 shrink-0 bg-zinc-950/20">
                                             <div className="text-[9px] uppercase font-black tracking-widest text-muted-foreground/40 space-x-2">
                                                 <span>Página {page} de {totalPages}</span>
                                                 <span className="opacity-20 text-[8px]">|</span>
-                                                <span>Exibindo 10 itens</span>
+                                                <span>Mostrando {startItem}–{endItem} de {totalCount}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
                                                 <Button
@@ -361,26 +371,22 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
                                                     <ChevronLeft className="h-4 w-4" />
                                                 </Button>
                                                 <div className="flex gap-1">
-                                                    {[...Array(Math.min(totalPages, 5))].map((_, i) => {
-                                                        const pageNum = i + 1;
-                                                        // Simplistic logic for middle pages could go here
-                                                        return (
-                                                            <Button
-                                                                key={pageNum}
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() => setPage(pageNum)}
-                                                                className={cn(
-                                                                    "h-8 w-8 rounded-xl text-[10px] font-black transition-all border border-white/5",
-                                                                    page === pageNum
-                                                                        ? "bg-brand-1 text-zinc-950 border-brand-1"
-                                                                        : "bg-white/5 hover:bg-white/10 text-muted-foreground"
-                                                                )}
-                                                            >
-                                                                {pageNum}
-                                                            </Button>
-                                                        );
-                                                    })}
+                                                    {pageNumbers.map((pageNum) => (
+                                                        <Button
+                                                            key={pageNum}
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => setPage(pageNum)}
+                                                            className={cn(
+                                                                "h-8 w-8 rounded-xl text-[10px] font-black transition-all border border-white/5",
+                                                                page === pageNum
+                                                                    ? "bg-brand-1 text-zinc-950 border-brand-1"
+                                                                    : "bg-white/5 hover:bg-white/10 text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            {pageNum}
+                                                        </Button>
+                                                    ))}
                                                 </div>
                                                 <Button
                                                     variant="ghost"

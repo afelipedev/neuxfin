@@ -38,6 +38,7 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
     const [filterMonth, setFilterMonth] = useState<number>(currentDate.getMonth() + 1)
     const [filterYear, setFilterYear] = useState<number>(currentDate.getFullYear())
     const [filterCategory, setFilterCategory] = useState<string>("all")
+    const [filterStatus, setFilterStatus] = useState<"todos" | "liquidado" | "pendente" | "atrasado">("todos")
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
 
@@ -47,10 +48,14 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
         year: currentDate.getFullYear()
     })
 
-    // Transações filtradas
+    // Transações do seletor (filtrar no backend para não "sumir" itens por paginação)
     const { transactions, loading: transactionsLoading } = useTransactions({
         month: filterMonth,
-        year: filterYear
+        year: filterYear,
+        tipo_transacao: filterType,
+        categoria_id: filterCategory !== "all" ? filterCategory : undefined,
+        status: filterStatus !== "todos" ? filterStatus : undefined,
+        pageSize: 200,
     })
 
     // Calcular receitas e despesas liquidadas
@@ -64,8 +69,6 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
 
     // Filtrar transações
     const filteredTransactions = transactions.filter(t => {
-        if (t.tipo_transacao !== filterType) return false
-        if (filterCategory !== "all" && t.categoria_id !== filterCategory) return false
         if (searchTerm && !t.descricao.toLowerCase().includes(searchTerm.toLowerCase())) return false
         return true
     })
@@ -77,8 +80,16 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
         .filter(Boolean)
         .reduce((sum, t) => sum + Number(t!.valor), 0)
 
-    // Categorias únicas
-    const categories = Array.from(new Set(transactions.map(t => t.categoria_id)))
+    // Categorias (id -> nome) para o filtro
+    const categoryOptions = Array.from(
+        new Map(
+            transactions
+                .filter(t => !!t.categoria_id)
+                .map(t => [t.categoria_id, t.categoria?.nome ?? t.categoria_id] as const)
+        ).entries()
+    )
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
 
     // Suporte a teclado
     useEffect(() => {
@@ -127,6 +138,11 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
         document.addEventListener('keydown', handleKeyDown)
         return () => document.removeEventListener('keydown', handleKeyDown)
     }, [isOpen, display])
+
+    // Evitar seleção "sobrando" ao trocar filtros/resultado
+    useEffect(() => {
+        setSelectedItems(new Set())
+    }, [filterMonth, filterYear, filterType, filterCategory, filterStatus, transactions.length])
 
     const handleButtonClick = (value: string) => {
         if (value === 'C') {
@@ -448,16 +464,28 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                             </div>
 
                             {/* Filtros */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                                 <Select value={filterCategory} onValueChange={setFilterCategory}>
                                     <SelectTrigger className="h-12 rounded-xl border-border bg-secondary/50">
                                         <SelectValue placeholder="Todas categorias" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">Todas categorias</SelectItem>
-                                        {categories.map(cat => (
-                                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                        {categoryOptions.map(cat => (
+                                            <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                                         ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
+                                    <SelectTrigger className="h-12 rounded-xl border-border bg-secondary/50">
+                                        <SelectValue placeholder="Todos status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="todos">Todos status</SelectItem>
+                                        <SelectItem value="liquidado">Liquidado</SelectItem>
+                                        <SelectItem value="pendente">Pendente</SelectItem>
+                                        <SelectItem value="atrasado">Atrasado</SelectItem>
                                     </SelectContent>
                                 </Select>
 
@@ -503,12 +531,24 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                         size="sm"
                                         onClick={toggleSelectAll}
                                         className="text-xs font-bold"
+                                        asChild
                                     >
-                                        <Checkbox
-                                            checked={selectedItems.size === filteredTransactions.length && filteredTransactions.length > 0}
-                                            className="mr-2"
-                                        />
-                                        Selecionar todos
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault()
+                                                    toggleSelectAll()
+                                                }
+                                            }}
+                                        >
+                                            <Checkbox
+                                                checked={selectedItems.size === filteredTransactions.length && filteredTransactions.length > 0}
+                                                className="mr-2"
+                                            />
+                                            Selecionar todos
+                                        </div>
                                     </Button>
                                     {selectedItems.size > 0 && (
                                         <Button
