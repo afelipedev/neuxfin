@@ -34,69 +34,63 @@ export function SummaryCards({ stats, loading }: StatsProps) {
     return (
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
             <Card className="border-none glass-card glow-primary overflow-hidden group hover:shadow-2xl hover:shadow-brand-1/10 transition-all duration-500 cursor-pointer active:scale-[0.98]">
-                <CardContent className="p-6">
-                    <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Saldo Disponível</p>
-                            <h3 className="text-3xl font-black text-brand-1 tracking-tighter">
-                                {formatCurrency(stats.saldo_atual)}
-                            </h3>
-                            <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">Resultado Líquido</p>
-                        </div>
-                        <div className="h-10 w-10 rounded-xl bg-brand-1/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-1 group-hover:text-zinc-950 shadow-lg shadow-brand-1/20 transition-all duration-500">
-                            <Wallet className="h-5 w-5" />
-                        </div>
+                <CardContent className="p-5 sm:p-6 relative">
+                    <div className="absolute right-4 top-4 h-10 w-10 rounded-xl bg-brand-1/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-1 group-hover:text-zinc-950 shadow-lg shadow-brand-1/20 transition-all duration-500">
+                        <Wallet className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1 pr-14">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Saldo Disponível</p>
+                        <h3 className="text-[clamp(1.4rem,2.3vw,1.875rem)] font-black text-brand-1 tracking-tighter leading-none font-display tabular-nums whitespace-nowrap">
+                            {formatCurrency(stats.saldo_atual)}
+                        </h3>
+                        <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">
+                            Contas − despesas pagas
+                        </p>
                     </div>
                 </CardContent>
             </Card>
 
             <Card className="border-none glass-card overflow-hidden group hover:shadow-2xl hover:shadow-brand-2/10 transition-all duration-500 cursor-pointer active:scale-[0.98]">
-                <CardContent className="p-6">
-                    <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Receitas do Mês</p>
-                            <h3 className="text-3xl font-black text-brand-2 tracking-tighter">
-                                {formatCurrency(stats.total_receitas)}
-                            </h3>
-                            <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">Total Entradas</p>
-                        </div>
-                        <div className="h-10 w-10 rounded-xl bg-brand-2/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-2 group-hover:text-zinc-950 shadow-lg shadow-brand-2/20 transition-all duration-500">
-                            <ArrowUpRight className="h-5 w-5" />
-                        </div>
+                <CardContent className="p-5 sm:p-6 relative">
+                    <div className="absolute right-4 top-4 h-10 w-10 rounded-xl bg-brand-2/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-2 group-hover:text-zinc-950 shadow-lg shadow-brand-2/20 transition-all duration-500">
+                        <ArrowUpRight className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1 pr-14">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Receitas do Mês</p>
+                        <h3 className="text-[clamp(1.4rem,2.3vw,1.875rem)] font-black text-brand-2 tracking-tighter leading-none font-display tabular-nums whitespace-nowrap">
+                            {formatCurrency(stats.total_receitas)}
+                        </h3>
+                        <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">Total Entradas</p>
                     </div>
                 </CardContent>
             </Card>
 
             <Card className="border-none glass-card overflow-hidden group hover:shadow-2xl hover:shadow-rose-500/10 transition-all duration-500 cursor-pointer active:scale-[0.98]">
-                <CardContent className="p-6">
-                    <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Despesas Pagas</p>
-                            <h3 className="text-3xl font-black text-rose-500 tracking-tighter">
-                                {formatCurrency(stats.total_despesas_pagas)}
-                            </h3>
-                            <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">Total Efetuado</p>
-                        </div>
-                        <div className="h-10 w-10 rounded-xl bg-rose-500/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-rose-500 group-hover:text-white shadow-lg shadow-rose-500/20 transition-all duration-500">
-                            <ArrowDownRight className="h-5 w-5" />
-                        </div>
+                <CardContent className="p-5 sm:p-6 relative">
+                    <div className="absolute right-4 top-4 h-10 w-10 rounded-xl bg-rose-500/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-rose-500 group-hover:text-white shadow-lg shadow-rose-500/20 transition-all duration-500">
+                        <ArrowDownRight className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1 pr-14">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Despesas Pagas</p>
+                        <h3 className="text-[clamp(1.4rem,2.3vw,1.875rem)] font-black text-rose-500 tracking-tighter leading-none font-display tabular-nums whitespace-nowrap">
+                            {formatCurrency(stats.total_despesas_pagas)}
+                        </h3>
+                        <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">Total Efetuado</p>
                     </div>
                 </CardContent>
             </Card>
 
             <Card className="border-none glass-card overflow-hidden group hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-500 cursor-pointer active:scale-[0.98]">
-                <CardContent className="p-6">
-                    <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Despesas Pendentes</p>
-                            <h3 className="text-3xl font-black text-amber-500 tracking-tighter">
-                                {formatCurrency(stats.total_despesas_pendentes)}
-                            </h3>
-                            <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">Total à Pagar</p>
-                        </div>
-                        <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-amber-500 group-hover:text-white shadow-lg shadow-amber-500/20 transition-all duration-500">
-                            <AlertTriangle className="h-5 w-5" />
-                        </div>
+                <CardContent className="p-5 sm:p-6 relative">
+                    <div className="absolute right-4 top-4 h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-amber-500 group-hover:text-white shadow-lg shadow-amber-500/20 transition-all duration-500">
+                        <AlertTriangle className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1 pr-14">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Despesas Pendentes</p>
+                        <h3 className="text-[clamp(1.4rem,2.3vw,1.875rem)] font-black text-amber-500 tracking-tighter leading-none font-display tabular-nums whitespace-nowrap">
+                            {formatCurrency(stats.total_despesas_pendentes)}
+                        </h3>
+                        <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">Total à Pagar</p>
                     </div>
                 </CardContent>
             </Card>
@@ -111,11 +105,11 @@ export function QuickBalanceDetail({ stats, loading }: StatsProps) {
 
     return (
         <Card className="border-none glass-card bg-gradient-to-br from-secondary/30 to-brand-1/5 dark:from-white/5 dark:to-brand-1/5 overflow-hidden shadow-2xl shadow-brand-1/5 transition-all duration-300">
-            <CardContent className="p-6 space-y-6">
-                <div className="flex justify-between items-center">
+            <CardContent className="p-5 sm:p-6 space-y-6">
+                <div className="flex justify-between items-center gap-3">
                     <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Saldo Disponível</h4>
                     <span className={cn(
-                        "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter",
+                        "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter shrink-0",
                         stats.saldo_atual >= 0 ? "bg-brand-1/10 text-brand-1" : "bg-rose-500/10 text-rose-500"
                     )}>
                         {stats.saldo_atual >= 0 ? "Positivo" : "Negativo"}
@@ -124,7 +118,7 @@ export function QuickBalanceDetail({ stats, loading }: StatsProps) {
 
                 <div className="space-y-1">
                     <h3 className={cn(
-                        "text-4xl font-black tracking-tighter",
+                        "text-3xl sm:text-4xl font-black tracking-tighter leading-none font-display tabular-nums break-words",
                         stats.saldo_atual >= 0 ? "text-brand-1" : "text-rose-500"
                     )}>
                         {formatCurrency(stats.saldo_atual)}
@@ -132,19 +126,19 @@ export function QuickBalanceDetail({ stats, loading }: StatsProps) {
                 </div>
 
                 <div className="space-y-3 pt-4 border-t border-border">
-                    <div className="flex justify-between text-[11px] font-semibold">
-                        <span className="text-muted-foreground/60">Receitas Recebidas:</span>
+                    <div className="flex justify-between gap-3 text-[11px] font-semibold">
+                        <span className="text-muted-foreground/60 min-w-0">Receitas Recebidas:</span>
                         <span className="text-brand-2 font-bold font-body">{formatCurrency(stats.total_receitas_recebidas)}</span>
                     </div>
-                    <div className="flex justify-between text-[11px] font-semibold">
-                        <span className="text-muted-foreground/60">Despesas Pagas:</span>
+                    <div className="flex justify-between gap-3 text-[11px] font-semibold">
+                        <span className="text-muted-foreground/60 min-w-0">Despesas Pagas:</span>
                         <span className="text-rose-500 font-bold font-body">{formatCurrency(stats.total_despesas_pagas)}</span>
                     </div>
-                    <div className="flex justify-between text-[11px] font-semibold">
-                        <span className="text-muted-foreground/60">Despesas Pendentes:</span>
+                    <div className="flex justify-between gap-3 text-[11px] font-semibold">
+                        <span className="text-muted-foreground/60 min-w-0">Despesas Pendentes:</span>
                         <span className="text-amber-500 font-bold font-body">{formatCurrency(stats.total_despesas_pendentes)}</span>
                     </div>
-                    <div className="flex justify-between pt-2 text-xs font-black border-t border-border">
+                    <div className="flex justify-between gap-3 pt-2 text-xs font-black border-t border-border">
                         <span className="uppercase tracking-widest text-[10px] text-foreground/50">Resultado:</span>
                         <span className="text-brand-1">{formatCurrency(stats.saldo_atual)}</span>
                     </div>

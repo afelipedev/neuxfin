@@ -409,15 +409,31 @@ export async function getDashboardStats(filters: { month?: number, year?: number
     const startDate = formatDateToISO(new Date(year, month - 1, 1))
     const endDate = formatDateToISO(new Date(year, month, 0))
 
+    type DashboardTxRow = {
+        valor: number | string
+        tipo_transacao: 'receita' | 'despesa'
+        status: 'liquidado' | 'pendente' | 'atrasado'
+        conta_id: string | null
+    }
+
     const { data: transactions, error } = await supabase
         .from('transacoes')
-        .select('valor, tipo_transacao, status')
+        .select('valor, tipo_transacao, status, conta_id')
         .gte('data_vencimento', startDate)
         .lte('data_vencimento', endDate)
 
     if (error) throw error
 
-    const stats = (transactions || []).reduce((acc: any, t: any) => {
+    type DashboardStatsAccumulator = {
+        total_receitas: number
+        total_receitas_recebidas: number
+        total_despesas: number
+        total_despesas_pagas: number
+        total_despesas_pendentes: number
+        total_despesas_pagas_sem_conta: number
+    }
+
+    const stats = ((transactions || []) as DashboardTxRow[]).reduce((acc, t) => {
         const valor = Number(t.valor)
         if (t.tipo_transacao === 'receita') {
             acc.total_receitas += valor
@@ -428,6 +444,11 @@ export async function getDashboardStats(filters: { month?: number, year?: number
             acc.total_despesas += valor
             if (t.status === 'liquidado') {
                 acc.total_despesas_pagas += valor
+                // Importante: despesas pagas sem conta bancária vinculada não impactam
+                // os saldos das contas e precisam ser consideradas à parte.
+                if (t.conta_id == null) {
+                    acc.total_despesas_pagas_sem_conta += valor
+                }
             } else {
                 acc.total_despesas_pendentes += valor
             }
@@ -438,12 +459,44 @@ export async function getDashboardStats(filters: { month?: number, year?: number
         total_receitas_recebidas: 0,
         total_despesas: 0,
         total_despesas_pagas: 0,
-        total_despesas_pendentes: 0
-    })
+        total_despesas_pendentes: 0,
+        total_despesas_pagas_sem_conta: 0
+    } satisfies DashboardStatsAccumulator)
+
+    // Saldo disponível: soma dos saldos atuais das contas bancárias (saldo_inicial + transações liquidadas da conta)
+    // menos despesas pagas que não possuem conta vinculada (para evitar dupla contagem).
+    const { data: bankAccounts, error: bankAccountsError } = await supabase
+        .from('contas_bancarias')
+        .select('id, saldo_inicial')
+
+    if (bankAccountsError) throw bankAccountsError
+
+    const accounts = (bankAccounts || []) as Array<{ id: string; saldo_inicial: number }>
+    const totalSaldoInicial = accounts.reduce((acc, a) => acc + Number(a.saldo_inicial || 0), 0)
+
+    let totalDeltaContas = 0
+    if (accounts.length > 0) {
+        type AccountTxRow = { tipo_transacao: 'receita' | 'despesa'; valor: number | string }
+        const accountIds = accounts.map(a => a.id)
+        const { data: accountTransactions, error: accountTxError } = await supabase
+            .from('transacoes')
+            .select('tipo_transacao, valor')
+            .in('conta_id', accountIds)
+            .eq('status', 'liquidado')
+
+        if (accountTxError) throw accountTxError
+
+        totalDeltaContas = ((accountTransactions || []) as AccountTxRow[]).reduce((acc, tx) => {
+            const valor = Number(tx.valor)
+            return tx.tipo_transacao === 'receita' ? acc + valor : acc - valor
+        }, 0)
+    }
+
+    const totalContasBancarias = totalSaldoInicial + totalDeltaContas
 
     return {
         ...stats,
-        saldo_atual: stats.total_receitas_recebidas - stats.total_despesas_pagas
+        saldo_atual: totalContasBancarias - stats.total_despesas_pagas_sem_conta
     }
 }
 
