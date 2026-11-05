@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { openai } from '@ai-sdk/openai'
 import { generateText, tool } from 'ai'
 import { createClient } from '@supabase/supabase-js'
@@ -6,7 +7,33 @@ import {
     addTransactionSchema
 } from '@/features/ai-chat/tools/finance-tools'
 
+/**
+ * Valida o segredo compartilhado com a automação externa (ex.: WhatsApp/n8n).
+ * Espera o header `Authorization: Bearer <AGENT_API_SECRET>`.
+ * Falha fechado: se a variável não estiver configurada, nenhuma requisição passa.
+ */
+function isAuthorized(req: Request): boolean {
+    const secret = process.env.AGENT_API_SECRET
+    if (!secret) return false
+
+    const header = req.headers.get('authorization') ?? ''
+    const [scheme, token] = header.split(' ')
+    if (scheme !== 'Bearer' || !token) return false
+
+    // Compara hashes para ter comprimento fixo e evitar timing attacks
+    const expected = createHash('sha256').update(secret).digest()
+    const received = createHash('sha256').update(token).digest()
+    return timingSafeEqual(expected, received)
+}
+
 export async function POST(req: Request) {
+    if (!isAuthorized(req)) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+        })
+    }
+
     try {
         const { message, userId } = await req.json()
 
