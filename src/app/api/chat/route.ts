@@ -42,7 +42,7 @@ export async function POST(req: Request) {
         messages,
         tools: {
             get_balance: tool({
-                description: 'Verifica o saldo financeiro atual (receitas recebidas - despesas pagas).',
+                description: 'Retorna o saldo disponível hoje (soma das contas bancárias), o saldo de cada conta, o saldo previsto até o fim do mês e o resumo de receitas/despesas do mês. Ao falar de "saldo", use saldo_disponivel.',
                 inputSchema: getBalanceSchema,
                 execute: getBalance,
             }),

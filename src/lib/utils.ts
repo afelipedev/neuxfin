@@ -38,3 +38,19 @@ export function formatDateToISO(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+const brlFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+
+/** Formata um valor numérico em Reais (R$). */
+export function formatCurrency(value: number): string {
+  return brlFormatter.format(value)
+}
+
+/**
+ * Cria uma data no dia informado do mês alvo, limitando ao último dia do mês
+ * (ex.: dia 31 em fevereiro vira 28/29 em vez de "transbordar" para março).
+ */
+export function dateInMonthClamped(year: number, monthIndex: number, day: number): Date {
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate()
+  return new Date(year, monthIndex, Math.min(day, lastDay))
+}

@@ -1,5 +1,15 @@
 import { createClient } from '@/lib/supabase/client'
-import { parseLocalDate, formatDateToISO } from '@/lib/utils'
+import { parseLocalDate, formatDateToISO, dateInMonthClamped } from '@/lib/utils'
+import {
+    BalanceTx,
+    computeProjectedBalance,
+    countLiquidatedWithoutAccount,
+    deriveStatus,
+    fetchBalanceOverview,
+    fromCents,
+    toCents,
+    todayISO
+} from '@/features/bank-accounts/services/balances'
 
 export interface Transaction {
     id: string
@@ -91,8 +101,13 @@ export async function getTransactions(filters: TransactionFilters = {}) {
         query = query.eq('tipo_transacao', tipo_transacao)
     }
 
-    if (status && status !== 'todos') {
-        query = query.eq('status', status)
+    // "atrasado" é derivado: em aberto com vencimento anterior a hoje
+    if (status === 'liquidado') {
+        query = query.eq('status', 'liquidado')
+    } else if (status === 'pendente') {
+        query = query.neq('status', 'liquidado').gte('data_vencimento', todayISO())
+    } else if (status === 'atrasado') {
+        query = query.neq('status', 'liquidado').lt('data_vencimento', todayISO())
     }
 
     if (categoria_id) {
@@ -130,7 +145,7 @@ export async function getTransactionStats(filters: TransactionFilters = {}): Pro
 
     let query = supabase
         .from('transacoes')
-        .select('valor, status')
+        .select('valor, status, data_vencimento')
         .gte('data_vencimento', startDate)
         .lte('data_vencimento', endDate)
 
@@ -146,11 +161,12 @@ export async function getTransactionStats(filters: TransactionFilters = {}): Pro
 
     if (error) throw error
 
-    const stats = (transactions || []).reduce((acc: TransactionStats, t: any) => {
+    const today = todayISO()
+    const stats = ((transactions || []) as Pick<BalanceTx, 'valor' | 'status' | 'data_vencimento'>[]).reduce((acc: TransactionStats, t) => {
         const valor = Number(t.valor)
         acc.total += valor
 
-        switch (t.status) {
+        switch (deriveStatus(t, today)) {
             case 'liquidado':
                 acc.liquidado += valor
                 break
@@ -195,81 +211,57 @@ export async function createTransaction(transaction: Omit<Transaction, 'id' | 'c
 }
 
 /**
- * Cria transação parcelada
+ * Cria transação parcelada em um único INSERT (atômico: ou todas as parcelas
+ * são gravadas, ou nenhuma). O id da parcela 1 é gerado no client para que as
+ * demais já referenciem transacao_pai_id no mesmo comando.
+ * O valor é dividido em centavos; a diferença de arredondamento fica na parcela 1.
  */
 export async function createParceledTransaction(
     transaction: Omit<Transaction, 'id' | 'created_at' | 'parcela_atual' | 'total_parcelas'>,
     totalParcelas: number
 ) {
-    // Pegar o usuário autenticado
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
         throw new Error('Usuário não autenticado')
     }
 
-    const valorTotal = Number(transaction.valor)
-    const valorParcelaBase = Math.floor((valorTotal / totalParcelas) * 100) / 100
-    const resto = Number((valorTotal - (valorParcelaBase * totalParcelas)).toFixed(2))
+    const totalCents = toCents(transaction.valor)
+    const baseCents = Math.floor(totalCents / totalParcelas)
+    const restoCents = totalCents - baseCents * totalParcelas
 
-    const transacoes = []
     const dataBase = parseLocalDate(transaction.data_vencimento)
+    const paiId = crypto.randomUUID()
 
-    // Criar transação pai (primeira parcela)
-    const { data: transacaoPai, error: errorPai } = await supabase
+    const transacoes = Array.from({ length: totalParcelas }, (_, idx) => {
+        const numero = idx + 1
+        const isPai = numero === 1
+        // Mesmo dia nos meses seguintes, limitado ao último dia do mês (31 → 28/29/30)
+        const vencimento = dateInMonthClamped(dataBase.getFullYear(), dataBase.getMonth() + idx, dataBase.getDate())
+
+        return {
+            ...transaction,
+            ...(isPai ? { id: paiId } : {}),
+            usuario_id: user.id,
+            valor: fromCents(isPai ? baseCents + restoCents : baseCents),
+            parcela_atual: numero,
+            total_parcelas: totalParcelas,
+            data_vencimento: formatDateToISO(vencimento),
+            descricao: `${transaction.descricao} (${numero}/${totalParcelas})`,
+            transacao_pai_id: isPai ? null : paiId,
+            // Só a 1ª parcela herda o status escolhido; as futuras nascem pendentes
+            status: isPai ? transaction.status : ('pendente' as const),
+            data_pagamento: isPai ? transaction.data_pagamento : null,
+        }
+    })
+
+    const { data, error } = await supabase
         .from('transacoes')
-        .insert([{
-            ...transaction,
-            usuario_id: user.id,
-            valor: Number((valorParcelaBase + resto).toFixed(2)),
-            parcela_atual: 1,
-            total_parcelas: totalParcelas,
-            descricao: `${transaction.descricao} (1/${totalParcelas})`
-        }])
+        .insert(transacoes)
         .select()
-        .single()
 
-    if (errorPai) throw errorPai
-
-    transacoes.push(transacaoPai)
-
-    // Criar parcelas subsequentes
-    for (let i = 2; i <= totalParcelas; i++) {
-        // Calcular data: adiciona meses à data base
-        const dataVencimento = new Date(dataBase)
-        dataVencimento.setMonth(dataBase.getMonth() + (i - 1))
-
-        // Ajuste para meses com menos dias (previne pular mês se hoje for dia 31)
-        if (dataVencimento.getDate() !== dataBase.getDate()) {
-            dataVencimento.setDate(0)
-        }
-
-        const parcela = {
-            ...transaction,
-            usuario_id: user.id,
-            valor: valorParcelaBase,
-            parcela_atual: i,
-            total_parcelas: totalParcelas,
-            data_vencimento: formatDateToISO(dataVencimento),
-            data_pagamento: null, // Parcelas futuras sempre sem pagamento
-            descricao: `${transaction.descricao} (${i}/${totalParcelas})`,
-            transacao_pai_id: transacaoPai.id,
-            status: 'pendente' as const
-        }
-
-        transacoes.push(parcela)
-    }
-
-    // Inserir parcelas em lote (exceto a primeira que já foi inserida)
-    if (transacoes.length > 1) {
-        const { error: errorParcelas } = await supabase
-            .from('transacoes')
-            .insert(transacoes.slice(1))
-
-        if (errorParcelas) throw errorParcelas
-    }
-
-    return transacoes
+    if (error) throw error
+    return data as Transaction[]
 }
 
 /**
@@ -294,8 +286,8 @@ export async function replicateTransactions(
             const dataOriginal = parseLocalDate(transaction.data_vencimento)
             const dia = dataOriginal.getDate()
 
-            // Criar nova data mantendo o dia
-            const novaData = new Date(targetDate.year, targetDate.month - 1, dia)
+            // Mantém o dia, limitado ao último dia do mês alvo (31 → 28/29/30)
+            const novaData = dateInMonthClamped(targetDate.year, targetDate.month - 1, dia)
 
             const newTransaction = {
                 usuario_id: transaction.usuario_id,
@@ -345,20 +337,36 @@ export async function updateTransaction(id: string, updates: Partial<Transaction
 }
 
 /**
- * Exclui uma transação
+ * Exclui uma única transação.
+ * Se ela for a parcela "pai" de um parcelamento, as demais parcelas são
+ * re-vinculadas à próxima parcela antes da exclusão — sem isso o FK
+ * transacao_pai_id (ON DELETE CASCADE) apagaria o parcelamento inteiro.
  */
 export async function deleteTransaction(id: string) {
-    // Verificar se é uma transação parcelada
-    const { data: transaction } = await supabase
+    const { data: filhas, error: filhasError } = await supabase
         .from('transacoes')
-        .select('total_parcelas, transacao_pai_id')
-        .eq('id', id)
-        .single()
+        .select('id')
+        .eq('transacao_pai_id', id)
+        .order('parcela_atual', { ascending: true })
 
-    // Se for parcelada, perguntar se quer excluir todas
-    if (transaction?.total_parcelas && transaction.total_parcelas > 1) {
-        // Por enquanto, excluir apenas a transação específica
-        // TODO: Implementar modal de confirmação para excluir todas as parcelas
+    if (filhasError) throw filhasError
+
+    if (filhas && filhas.length > 0) {
+        const novoPaiId = filhas[0].id
+
+        const { error: promoteError } = await supabase
+            .from('transacoes')
+            .update({ transacao_pai_id: null })
+            .eq('id', novoPaiId)
+        if (promoteError) throw promoteError
+
+        if (filhas.length > 1) {
+            const { error: relinkError } = await supabase
+                .from('transacoes')
+                .update({ transacao_pai_id: novoPaiId })
+                .eq('transacao_pai_id', id)
+            if (relinkError) throw relinkError
+        }
     }
 
     const { error } = await supabase
@@ -370,7 +378,7 @@ export async function deleteTransaction(id: string) {
 }
 
 /**
- * Exclui todas as parcelas de uma transação parcelada
+ * Exclui todas as parcelas de uma transação parcelada (pai + filhas).
  */
 export async function deleteAllInstallments(transacaoPaiId: string) {
     const { error } = await supabase
@@ -387,116 +395,125 @@ export async function deleteAllInstallments(transacaoPaiId: string) {
 export async function updateTransactionStatus(
     id: string,
     status: 'liquidado' | 'pendente' | 'atrasado',
-    dataPagamento?: string
+    dataPagamento?: string,
+    contaId?: string | null
 ) {
-    const updates: Partial<Transaction> = { status }
-
-    if (status === 'liquidado' && dataPagamento) {
-        updates.data_pagamento = dataPagamento
-    } else if (status === 'pendente') {
-        updates.data_pagamento = null
-    }
-
-    return updateTransaction(id, updates)
+    return updateTransaction(id, buildStatusUpdate(status, dataPagamento, contaId))
 }
 
 /**
- * Busca estatísticas do dashboard
+ * Mantém status e data_pagamento coerentes:
+ * liquidado ⇒ data_pagamento preenchida (padrão: hoje); demais ⇒ data_pagamento nula.
  */
-export async function getDashboardStats(filters: { month?: number, year?: number } = {}) {
+export function buildStatusUpdate(
+    status: Transaction['status'],
+    dataPagamento?: string | null,
+    contaId?: string | null
+): Partial<Transaction> {
+    const updates: Partial<Transaction> = {
+        status,
+        data_pagamento: status === 'liquidado' ? (dataPagamento || todayISO()) : null
+    }
+    if (contaId !== undefined) updates.conta_id = contaId
+    return updates
+}
+
+export interface DashboardStats {
+    // Mês selecionado (competência: data_vencimento)
+    total_receitas: number
+    total_receitas_recebidas: number
+    total_despesas: number
+    total_despesas_pagas: number
+    total_despesas_pendentes: number
+    total_despesas_atrasadas: number
+    resultado_mes: number
+    // Saldos (independentes do mês navegado)
+    saldo_atual: number
+    saldo_previsto: number
+    receitas_a_receber: number
+    despesas_a_pagar: number
+    transacoes_pagas_sem_conta: number
+}
+
+export const EMPTY_DASHBOARD_STATS: DashboardStats = {
+    total_receitas: 0,
+    total_receitas_recebidas: 0,
+    total_despesas: 0,
+    total_despesas_pagas: 0,
+    total_despesas_pendentes: 0,
+    total_despesas_atrasadas: 0,
+    resultado_mes: 0,
+    saldo_atual: 0,
+    saldo_previsto: 0,
+    receitas_a_receber: 0,
+    despesas_a_pagar: 0,
+    transacoes_pagas_sem_conta: 0
+}
+
+/**
+ * Busca estatísticas do dashboard.
+ * - Totais do mês por data_vencimento (competência).
+ * - saldo_atual = Saldo Disponível hoje (soma das contas), igual em qualquer mês navegado.
+ * - saldo_previsto = saldo_atual + lançamentos em aberto (com conta) até o fim do mês selecionado.
+ * Regras de saldo centralizadas em features/bank-accounts/services/balances.ts.
+ */
+export async function getDashboardStats(filters: { month?: number, year?: number } = {}): Promise<DashboardStats> {
     const { month = new Date().getMonth() + 1, year = new Date().getFullYear() } = filters
 
     const startDate = formatDateToISO(new Date(year, month - 1, 1))
     const endDate = formatDateToISO(new Date(year, month, 0))
+    const today = todayISO()
 
-    type DashboardTxRow = {
-        valor: number | string
-        tipo_transacao: 'receita' | 'despesa'
-        status: 'liquidado' | 'pendente' | 'atrasado'
-        conta_id: string | null
+    type DashboardTxRow = Pick<BalanceTx, 'valor' | 'tipo_transacao' | 'status' | 'data_vencimento'>
+
+    const [monthResult, overview, semConta] = await Promise.all([
+        supabase
+            .from('transacoes')
+            .select('valor, tipo_transacao, status, data_vencimento')
+            .gte('data_vencimento', startDate)
+            .lte('data_vencimento', endDate),
+        fetchBalanceOverview(supabase),
+        countLiquidatedWithoutAccount(supabase)
+    ])
+
+    if (monthResult.error) throw monthResult.error
+
+    const c = {
+        receitas: 0, recebidas: 0,
+        despesas: 0, pagas: 0, pendentes: 0, atrasadas: 0
     }
 
-    const { data: transactions, error } = await supabase
-        .from('transacoes')
-        .select('valor, tipo_transacao, status, conta_id')
-        .gte('data_vencimento', startDate)
-        .lte('data_vencimento', endDate)
-
-    if (error) throw error
-
-    type DashboardStatsAccumulator = {
-        total_receitas: number
-        total_receitas_recebidas: number
-        total_despesas: number
-        total_despesas_pagas: number
-        total_despesas_pendentes: number
-        total_despesas_pagas_sem_conta: number
-    }
-
-    const stats = ((transactions || []) as DashboardTxRow[]).reduce((acc, t) => {
-        const valor = Number(t.valor)
+    for (const t of (monthResult.data || []) as DashboardTxRow[]) {
+        const cents = toCents(t.valor)
+        const status = deriveStatus(t, today)
         if (t.tipo_transacao === 'receita') {
-            acc.total_receitas += valor
-            if (t.status === 'liquidado') {
-                acc.total_receitas_recebidas += valor
-            }
+            c.receitas += cents
+            if (status === 'liquidado') c.recebidas += cents
         } else {
-            acc.total_despesas += valor
-            if (t.status === 'liquidado') {
-                acc.total_despesas_pagas += valor
-                // Importante: despesas pagas sem conta bancária vinculada não impactam
-                // os saldos das contas e precisam ser consideradas à parte.
-                if (t.conta_id == null) {
-                    acc.total_despesas_pagas_sem_conta += valor
-                }
-            } else {
-                acc.total_despesas_pendentes += valor
+            c.despesas += cents
+            if (status === 'liquidado') c.pagas += cents
+            else {
+                c.pendentes += cents
+                if (status === 'atrasado') c.atrasadas += cents
             }
         }
-        return acc
-    }, {
-        total_receitas: 0,
-        total_receitas_recebidas: 0,
-        total_despesas: 0,
-        total_despesas_pagas: 0,
-        total_despesas_pendentes: 0,
-        total_despesas_pagas_sem_conta: 0
-    } satisfies DashboardStatsAccumulator)
-
-    // Saldo disponível: soma dos saldos atuais das contas bancárias (saldo_inicial + transações liquidadas da conta)
-    // menos despesas pagas que não possuem conta vinculada (para evitar dupla contagem).
-    const { data: bankAccounts, error: bankAccountsError } = await supabase
-        .from('contas_bancarias')
-        .select('id, saldo_inicial')
-
-    if (bankAccountsError) throw bankAccountsError
-
-    const accounts = (bankAccounts || []) as Array<{ id: string; saldo_inicial: number }>
-    const totalSaldoInicial = accounts.reduce((acc, a) => acc + Number(a.saldo_inicial || 0), 0)
-
-    let totalDeltaContas = 0
-    if (accounts.length > 0) {
-        type AccountTxRow = { tipo_transacao: 'receita' | 'despesa'; valor: number | string }
-        const accountIds = accounts.map(a => a.id)
-        const { data: accountTransactions, error: accountTxError } = await supabase
-            .from('transacoes')
-            .select('tipo_transacao, valor')
-            .in('conta_id', accountIds)
-            .eq('status', 'liquidado')
-
-        if (accountTxError) throw accountTxError
-
-        totalDeltaContas = ((accountTransactions || []) as AccountTxRow[]).reduce((acc, tx) => {
-            const valor = Number(tx.valor)
-            return tx.tipo_transacao === 'receita' ? acc + valor : acc - valor
-        }, 0)
     }
 
-    const totalContasBancarias = totalSaldoInicial + totalDeltaContas
+    const projection = computeProjectedBalance(overview.saldo_disponivel, overview.transactions, endDate)
 
     return {
-        ...stats,
-        saldo_atual: totalContasBancarias - stats.total_despesas_pagas_sem_conta
+        total_receitas: fromCents(c.receitas),
+        total_receitas_recebidas: fromCents(c.recebidas),
+        total_despesas: fromCents(c.despesas),
+        total_despesas_pagas: fromCents(c.pagas),
+        total_despesas_pendentes: fromCents(c.pendentes),
+        total_despesas_atrasadas: fromCents(c.atrasadas),
+        resultado_mes: fromCents(c.receitas - c.despesas),
+        saldo_atual: overview.saldo_disponivel,
+        saldo_previsto: projection.saldo_previsto,
+        receitas_a_receber: projection.receitas_a_receber,
+        despesas_a_pagar: projection.despesas_a_pagar,
+        transacoes_pagas_sem_conta: semConta
     }
 }
 

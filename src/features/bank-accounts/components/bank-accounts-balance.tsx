@@ -1,13 +1,14 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useBankAccounts } from "@/features/bank-accounts/hooks/use-bank-accounts"
 import { Wallet, Building2, PiggyBank, Landmark, Coins, ChevronRight } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatCurrency } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 
-const iconMap = {
+export const accountIconMap = {
     corrente: Building2,
     poupanca: PiggyBank,
     investimento: Landmark,
@@ -16,16 +17,7 @@ const iconMap = {
 }
 
 export function BankAccountsBalance() {
-    const { accounts, loading, error } = useBankAccounts()
-
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL'
-        }).format(value)
-    }
-
-    const totalBalance = accounts.reduce((acc, account) => acc + account.saldo_atual, 0)
+    const { accounts, totalBalance, loading, error } = useBankAccounts()
 
     if (loading) {
         return (
@@ -68,7 +60,7 @@ export function BankAccountsBalance() {
                         <p className="text-[10px] font-black uppercase tracking-widest text-zinc-950/70 mb-2">
                             Saldo Total
                         </p>
-                        <p className="text-3xl font-black tracking-tighter text-zinc-950 font-display">
+                        <p className="text-3xl font-black tracking-tighter text-zinc-950 font-display tabular-nums">
                             {formatCurrency(totalBalance)}
                         </p>
                     </div>
@@ -83,28 +75,28 @@ export function BankAccountsBalance() {
                             <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground/50 italic">
                                 Nenhuma conta cadastrada
                             </p>
-                            <p className="text-xs text-muted-foreground/40 mt-2">
+                            <Link href="/configuracoes" className="text-xs text-brand-1 hover:underline mt-2 inline-block">
                                 Cadastre suas contas em Configurações
-                            </p>
+                            </Link>
                         </div>
                     ) : (
                         accounts.map((account) => {
-                            const Icon = iconMap[account.tipo] || Wallet
+                            const Icon = accountIconMap[account.tipo] || Wallet
                             const isPositive = account.saldo_atual >= 0
 
                             return (
-                                <div
+                                <Link
                                     key={account.id}
-                                    className="group/item relative overflow-hidden rounded-xl border border-border bg-background/50 p-4 transition-all hover:bg-brand-1/5 hover:border-brand-1/30 cursor-pointer active:scale-[0.98]"
+                                    href={`/contas/${account.id}`}
+                                    aria-label={`Ver extrato de ${account.nome}`}
+                                    className="group/item block relative overflow-hidden rounded-xl border border-border bg-background/50 p-4 transition-all hover:bg-brand-1/5 hover:border-brand-1/30 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-1"
                                 >
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3 flex-1">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
                                             <div
                                                 className={cn(
-                                                    "h-10 w-10 rounded-xl flex items-center justify-center transition-all group-hover/item:scale-110",
-                                                    account.cor
-                                                        ? `bg-[${account.cor}]/10`
-                                                        : "bg-brand-1/10"
+                                                    "h-10 w-10 rounded-xl flex items-center justify-center transition-all group-hover/item:scale-110 shrink-0",
+                                                    !account.cor && "bg-brand-1/10"
                                                 )}
                                                 style={account.cor ? {
                                                     backgroundColor: `${account.cor}15`,
@@ -123,18 +115,16 @@ export function BankAccountsBalance() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <div className="text-right">
-                                                <p className={cn(
-                                                    "font-black text-sm tracking-tighter",
-                                                    isPositive ? "text-brand-2" : "text-rose-500"
-                                                )}>
-                                                    {formatCurrency(account.saldo_atual)}
-                                                </p>
-                                            </div>
+                                            <p className={cn(
+                                                "font-black text-sm tracking-tighter tabular-nums",
+                                                isPositive ? "text-brand-2" : "text-rose-500"
+                                            )}>
+                                                {formatCurrency(account.saldo_atual)}
+                                            </p>
                                             <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover/item:text-brand-1 transition-colors" />
                                         </div>
                                     </div>
-                                </div>
+                                </Link>
                             )
                         })
                     )}

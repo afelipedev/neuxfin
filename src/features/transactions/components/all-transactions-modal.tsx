@@ -41,6 +41,7 @@ import { CategoryPieChart } from "@/features/dashboard/components/category-pie-c
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 // import * as XLSX from 'xlsx' // Removido para import dinâmico em handleExport
+import { DataTablePagination } from "@/components/data-table-pagination"
 import { cn, parseLocalDate } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -58,7 +59,7 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
     const [nature, setNature] = React.useState<'todos' | 'receita' | 'despesa'>('todos')
     const [category, setCategory] = React.useState<string>('todos')
     const [page, setPage] = React.useState(1)
-    const pageSize = 5
+    const [pageSize, setPageSize] = React.useState(5)
 
     const filters = React.useMemo(() => ({
         month,
@@ -98,17 +99,6 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
             setChartData(Object.values(summary))
         }
     }, [allTransactions])
-
-    const totalPages = Math.ceil(totalCount / pageSize)
-    const startItem = (page - 1) * pageSize + 1
-    const endItem = Math.min(page * pageSize, totalCount)
-    const pageNumbers = React.useMemo(() => {
-        if (totalPages <= 1) return [1]
-        const maxButtons = 5
-        const start = Math.max(1, Math.min(page - 2, totalPages - (maxButtons - 1)))
-        const end = Math.min(totalPages, start + (maxButtons - 1))
-        return Array.from({ length: end - start + 1 }, (_, i) => start + i)
-    }, [page, totalPages])
 
     const handleExport = async () => {
         const XLSX = await import('xlsx')
@@ -295,8 +285,8 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
                                 <CardContent className="p-0 px-2 flex-1 min-h-0 flex flex-col">
                                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                                         <Table>
-                                            <TableHeader className="sticky top-0 bg-zinc-950/50 backdrop-blur-md z-10">
-                                                <TableRow className="border-none hover:bg-transparent text-muted-foreground/30">
+                                            <TableHeader className="sticky top-0 z-10">
+                                                <TableRow>
                                                     <TableHead className="font-black text-[9px] uppercase tracking-widest h-12 px-6">Descrição</TableHead>
                                                     <TableHead className="font-black text-[9px] uppercase tracking-widest h-12">Data</TableHead>
                                                     <TableHead className="font-black text-[9px] uppercase tracking-widest h-12">Perfil</TableHead>
@@ -352,53 +342,16 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
                                         </Table>
                                     </div>
 
-                                    {/* Pagination - Fixed at bottom of the card */}
-                                    {!loading && totalCount > pageSize && (
-                                        <div className="flex items-center justify-between px-6 py-4 border-t border-white/5 shrink-0 bg-zinc-950/20">
-                                            <div className="text-[9px] uppercase font-black tracking-widest text-muted-foreground/40 space-x-2">
-                                                <span>Página {page} de {totalPages}</span>
-                                                <span className="opacity-20 text-[8px]">|</span>
-                                                <span>Mostrando {startItem}–{endItem} de {totalCount}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => { setPage(p => Math.max(1, p - 1)); }}
-                                                    disabled={page === 1}
-                                                    className="h-8 w-8 rounded-xl bg-white/5 hover:bg-brand-1 hover:text-zinc-950 disabled:opacity-10 transition-all font-display border border-white/5"
-                                                >
-                                                    <ChevronLeft className="h-4 w-4" />
-                                                </Button>
-                                                <div className="flex gap-1">
-                                                    {pageNumbers.map((pageNum) => (
-                                                        <Button
-                                                            key={pageNum}
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() => setPage(pageNum)}
-                                                            className={cn(
-                                                                "h-8 w-8 rounded-xl text-[10px] font-black transition-all border border-white/5",
-                                                                page === pageNum
-                                                                    ? "bg-brand-1 text-zinc-950 border-brand-1"
-                                                                    : "bg-white/5 hover:bg-white/10 text-muted-foreground"
-                                                            )}
-                                                        >
-                                                            {pageNum}
-                                                        </Button>
-                                                    ))}
-                                                </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => { setPage(p => Math.min(totalPages, p + 1)); }}
-                                                    disabled={page === totalPages}
-                                                    className="h-8 w-8 rounded-xl bg-white/5 hover:bg-brand-1 hover:text-zinc-950 disabled:opacity-10 transition-all font-display border border-white/5"
-                                                >
-                                                    <ChevronRight className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
+                                    {!loading && (
+                                        <DataTablePagination
+                                            className="shrink-0"
+                                            page={page}
+                                            pageSize={pageSize}
+                                            totalCount={totalCount}
+                                            onPageChange={setPage}
+                                            onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+                                            pageSizeOptions={[5, 10, 20]}
+                                        />
                                     )}
                                 </CardContent>
                             </Card>

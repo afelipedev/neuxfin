@@ -2,17 +2,11 @@ import { ArrowUpRight, ArrowDownRight, TrendingUp, AlertTriangle, Wallet, ArrowU
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, formatCurrency } from "@/lib/utils"
+import type { DashboardStats } from "@/features/transactions/services/transactions"
 
 interface StatsProps {
-    stats: {
-        total_receitas: number
-        total_receitas_recebidas: number
-        total_despesas: number
-        total_despesas_pagas: number
-        total_despesas_pendentes: number
-        saldo_atual: number
-    }
+    stats: DashboardStats
     loading?: boolean
 }
 
@@ -25,10 +19,6 @@ export function SummaryCards({ stats, loading }: StatsProps) {
                 ))}
             </div>
         )
-    }
-
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
     }
 
     return (
@@ -44,7 +34,7 @@ export function SummaryCards({ stats, loading }: StatsProps) {
                             {formatCurrency(stats.saldo_atual)}
                         </h3>
                         <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">
-                            Contas − despesas pagas
+                            Soma das contas hoje
                         </p>
                     </div>
                 </CardContent>
@@ -60,7 +50,7 @@ export function SummaryCards({ stats, loading }: StatsProps) {
                         <h3 className="text-[clamp(1.4rem,2.3vw,1.875rem)] font-black text-brand-2 tracking-tighter leading-none font-display tabular-nums whitespace-nowrap">
                             {formatCurrency(stats.total_receitas)}
                         </h3>
-                        <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">Total Entradas</p>
+                        <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">Recebido {formatCurrency(stats.total_receitas_recebidas)}</p>
                     </div>
                 </CardContent>
             </Card>
@@ -75,7 +65,7 @@ export function SummaryCards({ stats, loading }: StatsProps) {
                         <h3 className="text-[clamp(1.4rem,2.3vw,1.875rem)] font-black text-rose-500 tracking-tighter leading-none font-display tabular-nums whitespace-nowrap">
                             {formatCurrency(stats.total_despesas_pagas)}
                         </h3>
-                        <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">Total Efetuado</p>
+                        <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">De {formatCurrency(stats.total_despesas)} no mês</p>
                     </div>
                 </CardContent>
             </Card>
@@ -90,7 +80,14 @@ export function SummaryCards({ stats, loading }: StatsProps) {
                         <h3 className="text-[clamp(1.4rem,2.3vw,1.875rem)] font-black text-amber-500 tracking-tighter leading-none font-display tabular-nums whitespace-nowrap">
                             {formatCurrency(stats.total_despesas_pendentes)}
                         </h3>
-                        <p className="text-[10px] text-muted-foreground/50 font-medium font-body uppercase tracking-tighter">Total à Pagar</p>
+                        <p className={cn(
+                            "text-[10px] font-medium font-body uppercase tracking-tighter",
+                            stats.total_despesas_atrasadas > 0 ? "text-rose-500" : "text-muted-foreground/50"
+                        )}>
+                            {stats.total_despesas_atrasadas > 0
+                                ? `${formatCurrency(stats.total_despesas_atrasadas)} em atraso`
+                                : "Total a pagar"}
+                        </p>
                     </div>
                 </CardContent>
             </Card>
@@ -98,51 +95,74 @@ export function SummaryCards({ stats, loading }: StatsProps) {
     )
 }
 
-export function QuickBalanceDetail({ stats, loading }: StatsProps) {
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-    }
+export function QuickBalanceDetail({ stats }: StatsProps) {
+    const positivo = stats.saldo_atual >= 0
 
     return (
         <Card className="border-none glass-card bg-gradient-to-br from-secondary/30 to-brand-1/5 dark:from-white/5 dark:to-brand-1/5 overflow-hidden shadow-2xl shadow-brand-1/5 transition-all duration-300">
             <CardContent className="p-5 sm:p-6 space-y-6">
                 <div className="flex justify-between items-center gap-3">
-                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Saldo Disponível</h4>
+                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Saldo Disponível Hoje</h4>
                     <span className={cn(
                         "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter shrink-0",
-                        stats.saldo_atual >= 0 ? "bg-brand-1/10 text-brand-1" : "bg-rose-500/10 text-rose-500"
+                        positivo ? "bg-brand-1/10 text-brand-1" : "bg-rose-500/10 text-rose-500"
                     )}>
-                        {stats.saldo_atual >= 0 ? "Positivo" : "Negativo"}
+                        {positivo ? "Positivo" : "Negativo"}
                     </span>
                 </div>
 
-                <div className="space-y-1">
-                    <h3 className={cn(
-                        "text-3xl sm:text-4xl font-black tracking-tighter leading-none font-display tabular-nums break-words",
-                        stats.saldo_atual >= 0 ? "text-brand-1" : "text-rose-500"
-                    )}>
-                        {formatCurrency(stats.saldo_atual)}
-                    </h3>
+                <h3 className={cn(
+                    "text-3xl sm:text-4xl font-black tracking-tighter leading-none font-display tabular-nums break-words",
+                    positivo ? "text-brand-1" : "text-rose-500"
+                )}>
+                    {formatCurrency(stats.saldo_atual)}
+                </h3>
+
+                <div className="space-y-3 pt-4 border-t border-border">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-foreground/50">Previsão até o fim do mês</p>
+                    <div className="flex justify-between gap-3 text-[11px] font-semibold">
+                        <span className="text-muted-foreground/60 min-w-0">+ A receber:</span>
+                        <span className="text-brand-2 font-bold font-body tabular-nums">{formatCurrency(stats.receitas_a_receber)}</span>
+                    </div>
+                    <div className="flex justify-between gap-3 text-[11px] font-semibold">
+                        <span className="text-muted-foreground/60 min-w-0">− A pagar (inclui atrasadas):</span>
+                        <span className="text-amber-500 font-bold font-body tabular-nums">{formatCurrency(stats.despesas_a_pagar)}</span>
+                    </div>
+                    <div className="flex justify-between gap-3 pt-2 text-xs font-black border-t border-border">
+                        <span className="uppercase tracking-widest text-[10px] text-foreground/50">= Saldo previsto:</span>
+                        <span className={cn("tabular-nums", stats.saldo_previsto >= 0 ? "text-brand-1" : "text-rose-500")}>
+                            {formatCurrency(stats.saldo_previsto)}
+                        </span>
+                    </div>
                 </div>
 
                 <div className="space-y-3 pt-4 border-t border-border">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-foreground/50">Resultado do mês</p>
                     <div className="flex justify-between gap-3 text-[11px] font-semibold">
-                        <span className="text-muted-foreground/60 min-w-0">Receitas Recebidas:</span>
-                        <span className="text-brand-2 font-bold font-body">{formatCurrency(stats.total_receitas_recebidas)}</span>
+                        <span className="text-muted-foreground/60 min-w-0">Receitas:</span>
+                        <span className="text-brand-2 font-bold font-body tabular-nums">{formatCurrency(stats.total_receitas)}</span>
                     </div>
                     <div className="flex justify-between gap-3 text-[11px] font-semibold">
-                        <span className="text-muted-foreground/60 min-w-0">Despesas Pagas:</span>
-                        <span className="text-rose-500 font-bold font-body">{formatCurrency(stats.total_despesas_pagas)}</span>
-                    </div>
-                    <div className="flex justify-between gap-3 text-[11px] font-semibold">
-                        <span className="text-muted-foreground/60 min-w-0">Despesas Pendentes:</span>
-                        <span className="text-amber-500 font-bold font-body">{formatCurrency(stats.total_despesas_pendentes)}</span>
+                        <span className="text-muted-foreground/60 min-w-0">Despesas:</span>
+                        <span className="text-rose-500 font-bold font-body tabular-nums">{formatCurrency(stats.total_despesas)}</span>
                     </div>
                     <div className="flex justify-between gap-3 pt-2 text-xs font-black border-t border-border">
                         <span className="uppercase tracking-widest text-[10px] text-foreground/50">Resultado:</span>
-                        <span className="text-brand-1">{formatCurrency(stats.saldo_atual)}</span>
+                        <span className={cn("tabular-nums", stats.resultado_mes >= 0 ? "text-brand-1" : "text-rose-500")}>
+                            {formatCurrency(stats.resultado_mes)}
+                        </span>
                     </div>
                 </div>
+
+                {stats.transacoes_pagas_sem_conta > 0 && (
+                    <div className="flex gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-[11px] text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <p>
+                            {stats.transacoes_pagas_sem_conta} lançamento(s) pago(s) sem conta bancária não entram no saldo.
+                            Edite-os e vincule uma conta.
+                        </p>
+                    </div>
+                )}
             </CardContent>
         </Card>
     )

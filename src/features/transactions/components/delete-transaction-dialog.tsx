@@ -33,10 +33,10 @@ export function DeleteTransactionDialog({ transaction, onSuccess, trigger }: Del
     const isInstallment = transaction.total_parcelas && transaction.total_parcelas > 1
 
     const handleDelete = async () => {
-        const success = await remove(
-            transaction.transacao_pai_id || transaction.id,
-            deleteOption === 'all'
-        )
+        // "Só esta" exclui a própria parcela; "todas" parte da parcela pai
+        const success = deleteOption === 'all'
+            ? await remove(transaction.transacao_pai_id || transaction.id, true)
+            : await remove(transaction.id, false)
 
         if (success) {
             setOpen(false)
