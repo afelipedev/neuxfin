@@ -47,19 +47,30 @@ import { formatCurrency } from "@/lib/utils"
 import Link from "next/link"
 import { toast } from "sonner"
 
+const EMPTY_FORM = {
+    nome: "",
+    instituicao: "",
+    tipo: "corrente" as BankAccount['tipo'],
+    saldo_inicial: 0,
+    data_saldo_inicial: "",
+    cor: "#10b981",
+}
+
+type AccountForm = typeof EMPTY_FORM
+
+const toPayload = (form: AccountForm) => ({
+    ...form,
+    instituicao: form.instituicao || null,
+    data_saldo_inicial: form.data_saldo_inicial || null,
+})
+
 export function AccountsSettings() {
     const [accounts, setAccounts] = React.useState<Array<BankAccount & { saldo_atual: number }>>([])
     const paged = usePaginatedList(accounts, 10)
     const [loading, setLoading] = React.useState(true)
     const [isDialogOpen, setIsDialogOpen] = React.useState(false)
     const [editingAccount, setEditingAccount] = React.useState<BankAccount | null>(null)
-    const [formData, setFormData] = React.useState({
-        nome: "",
-        instituicao: "",
-        tipo: "corrente" as BankAccount['tipo'],
-        saldo_inicial: 0,
-        cor: "#10b981",
-    })
+    const [formData, setFormData] = React.useState(EMPTY_FORM)
     const [deletingId, setDeletingId] = React.useState<string | null>(null)
     const [saving, setSaving] = React.useState(false)
 
@@ -83,19 +94,19 @@ export function AccountsSettings() {
         setSaving(true)
         try {
             if (editingAccount) {
-                await settingsService.updateBankAccount(editingAccount.id, formData)
+                await settingsService.updateBankAccount(editingAccount.id, toPayload(formData))
                 toast.success("Conta atualizada", {
                     description: `A conta ${formData.nome} foi atualizada com sucesso.`
                 })
             } else {
-                await settingsService.createBankAccount(formData)
+                await settingsService.createBankAccount(toPayload(formData))
                 toast.success("Conta criada", {
                     description: `A conta ${formData.nome} foi criada com sucesso.`
                 })
             }
             setIsDialogOpen(false)
             setEditingAccount(null)
-            setFormData({ nome: "", instituicao: "", tipo: "corrente", saldo_inicial: 0, cor: "#10b981" })
+            setFormData(EMPTY_FORM)
             fetchAccounts()
         } catch (error) {
             toast.error(editingAccount ? "Erro ao atualizar conta" : "Erro ao criar conta", {
@@ -116,9 +127,16 @@ export function AccountsSettings() {
             setDeletingId(null)
             fetchAccounts()
         } catch (error) {
-            toast.error("Erro ao excluir", {
-                description: "Não foi possível excluir a conta."
+            // O banco bloqueia a exclusão de contas com lançamentos (trigger) e com
+            // transferências/movimentos de cofrinho (FK restrict).
+            const message = (error as { message?: string; code?: string })?.message
+            const code = (error as { code?: string })?.code
+            toast.error("Não foi possível excluir a conta", {
+                description: code === '23503'
+                    ? (message?.includes('lançamento') ? message : "A conta possui transferências ou movimentos de cofrinho vinculados.")
+                    : "Ocorreu um erro ao processar sua solicitação."
             })
+            setDeletingId(null)
         }
     }
 
@@ -128,7 +146,8 @@ export function AccountsSettings() {
             nome: account.nome,
             instituicao: account.instituicao || "",
             tipo: account.tipo,
-            saldo_inicial: account.saldo_inicial,
+            saldo_inicial: Number(account.saldo_inicial),
+            data_saldo_inicial: account.data_saldo_inicial ?? "",
             cor: account.cor || "#10b981",
         })
         setIsDialogOpen(true)
@@ -136,7 +155,7 @@ export function AccountsSettings() {
 
     const openCreateDialog = () => {
         setEditingAccount(null)
-        setFormData({ nome: "", instituicao: "", tipo: "corrente", saldo_inicial: 0, cor: "#10b981" })
+        setFormData(EMPTY_FORM)
         setIsDialogOpen(true)
     }
 
@@ -216,6 +235,18 @@ export function AccountsSettings() {
                                         value={formData.saldo_inicial}
                                         onChange={(e) => setFormData({ ...formData, saldo_inicial: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                                     />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="data_saldo">Saldo em (opcional)</Label>
+                                    <Input
+                                        id="data_saldo"
+                                        type="date"
+                                        value={formData.data_saldo_inicial}
+                                        onChange={(e) => setFormData({ ...formData, data_saldo_inicial: e.target.value })}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Lançamentos anteriores a esta data já estão no saldo inicial e não serão somados.
+                                    </p>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="cor">Cor</Label>

@@ -10,6 +10,7 @@ import {
     CofrinhoTransaction
 } from '../services/cofrinhos'
 import { toast } from 'sonner'
+import { useTransactionContextOptional } from '@/features/transactions/context/transaction-context'
 
 export function useCofrinhos() {
     const [cofrinhos, setCofrinhos] = useState<Cofrinho[]>([])
@@ -68,6 +69,7 @@ export function useCofrinhoTransactions(cofrinhoId?: string) {
 
 export function useCofrinhoActions() {
     const [loading, setLoading] = useState(false)
+    const notifyTransactions = useTransactionContextOptional()?.notifyTransactionChange
 
     const create = useCallback(async (cofrinho: Omit<Cofrinho, 'id' | 'usuario_id' | 'saldo_atual' | 'created_at'>) => {
         try {
@@ -107,7 +109,7 @@ export function useCofrinhoActions() {
             return true
         } catch (e: any) {
             console.error(e)
-            toast.error('Erro ao excluir cofrinho')
+            toast.error(e?.code === '23503' && e?.message ? e.message : 'Erro ao excluir cofrinho')
             return false
         } finally {
             setLoading(false)
@@ -119,15 +121,17 @@ export function useCofrinhoActions() {
             setLoading(true)
             await addCofrinhoTransaction(transaction)
             toast.success(transaction.tipo === 'aporte' ? 'Aporte realizado!' : 'Resgate realizado!')
+            // Movimentos com conta alteram saldos bancários
+            if (transaction.conta_id) notifyTransactions?.()
             return true
         } catch (e: any) {
             console.error(e)
-            toast.error('Erro ao realizar movimentação')
+            toast.error(e?.message ? `Erro: ${e.message}` : 'Erro ao realizar movimentação')
             return false
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [notifyTransactions])
 
     return {
         create,

@@ -5,8 +5,13 @@ import { formatDateToISO } from '@/lib/utils'
  * Fonte única de verdade para cálculos de saldo.
  *
  * Regras:
- * - Saldo da conta em D = saldo_inicial + receitas liquidadas − despesas liquidadas
- *   da conta cuja data efetiva (data_pagamento, ou data_vencimento se ausente) ≤ D.
+ * - Saldo da conta em D = saldo_inicial + entradas − saídas liquidadas da conta com data
+ *   efetiva ≤ D. Movimentos considerados:
+ *     · transações (receita +, despesa −), data efetiva = data_pagamento (ou vencimento);
+ *     · transferências (destino +, origem −);
+ *     · cofrinho com conta vinculada (resgate +, aporte −).
+ * - Se a conta tem data_saldo_inicial, movimentos anteriores a ela são ignorados
+ *   (já estão refletidos no saldo inicial).
  * - Saldo Disponível = soma dos saldos de todas as contas em "hoje".
  * - Saldo Previsto até D = Saldo Disponível + receitas pendentes − despesas pendentes/atrasadas
  *   vinculadas a contas com data_vencimento ≤ D.
@@ -18,6 +23,7 @@ import { formatDateToISO } from '@/lib/utils'
 
 export type TxStatus = 'liquidado' | 'pendente' | 'atrasado'
 export type TxKind = 'receita' | 'despesa'
+export type MovementOrigin = 'transacao' | 'transferencia' | 'cofrinho'
 
 export interface BalanceTx {
     id?: string
@@ -27,11 +33,14 @@ export interface BalanceTx {
     status: TxStatus
     data_vencimento: string
     data_pagamento: string | null
+    /** Ausente = transação comum. Transferências/cofrinho entram como movimentos liquidados. */
+    origem?: MovementOrigin
 }
 
 export interface BalanceAccount {
     id: string
     saldo_inicial: number | string | null
+    data_saldo_inicial?: string | null
 }
 
 // ---------- Helpers ----------
@@ -62,26 +71,34 @@ export function deriveStatus(
 
 const isOpen = (tx: Pick<BalanceTx, 'status'>) => tx.status !== 'liquidado'
 
-/** Valor com sinal em centavos (receita +, despesa −). */
+/** Valor com sinal em centavos (entrada +, saída −). */
 export const signedCents = (tx: Pick<BalanceTx, 'tipo_transacao' | 'valor'>): number =>
     tx.tipo_transacao === 'receita' ? toCents(tx.valor) : -toCents(tx.valor)
 
+/** Movimento liquidado que entra no saldo considerando a data de corte do saldo inicial. */
+const countsForBalance = (tx: BalanceTx, asOf: string, desde?: string | null) => {
+    if (tx.status !== 'liquidado') return false
+    const data = effectiveDate(tx)
+    return data <= asOf && (!desde || data >= isoDay(desde))
+}
+
 // ---------- Cálculos puros ----------
 
-/** Saldo de uma conta numa data (as transações devem pertencer à conta). */
+/** Saldo de uma conta numa data (os movimentos devem pertencer à conta). */
 export function computeAccountBalance(
     saldoInicial: number | string | null,
     txs: BalanceTx[],
-    asOf: string = todayISO()
+    asOf: string = todayISO(),
+    desde?: string | null
 ): number {
-    const cents = txs.reduce((acc, tx) => {
-        if (tx.status !== 'liquidado' || effectiveDate(tx) > asOf) return acc
-        return acc + signedCents(tx)
-    }, toCents(saldoInicial))
+    const cents = txs.reduce(
+        (acc, tx) => (countsForBalance(tx, asOf, desde) ? acc + signedCents(tx) : acc),
+        toCents(saldoInicial)
+    )
     return fromCents(cents)
 }
 
-/** Saldos de várias contas de uma vez, a partir de uma única lista de transações. */
+/** Saldos de várias contas de uma vez, a partir de uma única lista de movimentos. */
 export function computeAccountBalances<A extends BalanceAccount>(
     accounts: A[],
     txs: BalanceTx[],
@@ -96,7 +113,12 @@ export function computeAccountBalances<A extends BalanceAccount>(
     }
     return accounts.map(account => ({
         ...account,
-        saldo_atual: computeAccountBalance(account.saldo_inicial, byAccount.get(account.id) ?? [], asOf)
+        saldo_atual: computeAccountBalance(
+            account.saldo_inicial,
+            byAccount.get(account.id) ?? [],
+            asOf,
+            account.data_saldo_inicial
+        )
     }))
 }
 
@@ -144,17 +166,18 @@ export interface Statement<T extends BalanceTx> {
 }
 
 /**
- * Extrato da conta no período [from, to]: apenas lançamentos liquidados,
+ * Extrato da conta no período [from, to]: apenas movimentos liquidados,
  * ordenados pela data efetiva, com saldo corrido.
  */
 export function buildStatement<T extends BalanceTx>(
     saldoInicial: number | string | null,
     txs: T[],
     from: string,
-    to: string
+    to: string,
+    desde?: string | null
 ): Statement<T> {
     const liquidated = txs
-        .filter(tx => tx.status === 'liquidado')
+        .filter(tx => countsForBalance(tx, to, desde))
         .map(tx => ({ tx, data: effectiveDate(tx) }))
         .sort((a, b) => (a.data === b.data ? 0 : a.data < b.data ? -1 : 1))
 
@@ -164,7 +187,6 @@ export function buildStatement<T extends BalanceTx>(
     const rows: StatementRow<T>[] = []
 
     for (const { tx, data } of liquidated) {
-        if (data > to) break
         const cents = signedCents(tx)
         running += cents
         if (data < from) continue
@@ -173,20 +195,108 @@ export function buildStatement<T extends BalanceTx>(
         rows.push({ tx, data, valor_assinado: fromCents(cents), saldo_apos: fromCents(running) })
     }
 
-    const saldoFinal = fromCents(running)
     return {
         saldo_anterior: fromCents(running - entradas + saidas),
         entradas: fromCents(entradas),
         saidas: fromCents(saidas),
-        saldo_final: saldoFinal,
+        saldo_final: fromCents(running),
         rows
     }
+}
+
+// ---------- Movimentos de transferências e cofrinhos ----------
+
+export interface TransferRow {
+    id: string
+    conta_origem_id: string
+    conta_destino_id: string
+    valor: number | string
+    data: string
+    descricao: string | null
+}
+
+export interface CofrinhoMovRow {
+    id: string
+    tipo: 'aporte' | 'resgate'
+    valor: number | string
+    data: string
+    conta_id: string
+    cofrinho: { nome: string } | null
+}
+
+/** Movimento exibível no extrato (transação, transferência ou cofrinho). */
+export interface StatementTx extends BalanceTx {
+    id: string
+    origem: MovementOrigin
+    /** id do registro de origem (transferência/movimento de cofrinho) */
+    ref_id: string
+    descricao: string
+    categoria: { nome: string } | null
+}
+
+/** Converte transferências em movimentos: saída na origem e entrada no destino. */
+export function transfersToMovements(rows: TransferRow[], contaId?: string): StatementTx[] {
+    const out: StatementTx[] = []
+    for (const t of rows) {
+        const data = isoDay(t.data)
+        const base = {
+            valor: t.valor,
+            status: 'liquidado' as const,
+            data_vencimento: data,
+            data_pagamento: data,
+            origem: 'transferencia' as const,
+            ref_id: t.id,
+            categoria: { nome: 'Transferência' }
+        }
+        if (!contaId || t.conta_origem_id === contaId) {
+            out.push({
+                ...base,
+                id: `transferencia:${t.id}:saida`,
+                conta_id: t.conta_origem_id,
+                tipo_transacao: 'despesa',
+                descricao: t.descricao || 'Transferência enviada'
+            })
+        }
+        if (!contaId || t.conta_destino_id === contaId) {
+            out.push({
+                ...base,
+                id: `transferencia:${t.id}:entrada`,
+                conta_id: t.conta_destino_id,
+                tipo_transacao: 'receita',
+                descricao: t.descricao || 'Transferência recebida'
+            })
+        }
+    }
+    return out
+}
+
+/** Aporte no cofrinho = saída da conta; resgate = entrada na conta. */
+export function cofrinhoToMovements(rows: CofrinhoMovRow[]): StatementTx[] {
+    return rows.map(m => {
+        // data é timestamptz: converter para o dia local
+        const data = formatDateToISO(new Date(m.data))
+        const nome = m.cofrinho?.nome ?? 'cofrinho'
+        return {
+            id: `cofrinho:${m.id}`,
+            ref_id: m.id,
+            origem: 'cofrinho' as const,
+            conta_id: m.conta_id,
+            tipo_transacao: m.tipo === 'resgate' ? 'receita' : 'despesa',
+            valor: m.valor,
+            status: 'liquidado' as const,
+            data_vencimento: data,
+            data_pagamento: data,
+            descricao: m.tipo === 'resgate' ? `Resgate do cofrinho ${nome}` : `Aporte no cofrinho ${nome}`,
+            categoria: { nome: 'Cofrinho' }
+        }
+    })
 }
 
 // ---------- Acesso a dados (cliente injetado: browser ou server) ----------
 
 const PAGE_SIZE = 1000
 const BALANCE_TX_COLUMNS = 'id, conta_id, tipo_transacao, valor, status, data_vencimento, data_pagamento'
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * Busca todas as linhas paginando (o PostgREST limita a 1000 por requisição,
@@ -204,36 +314,76 @@ async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ da
     }
 }
 
-/** Todas as transações vinculadas a contas (liquidadas e em aberto). */
-export function fetchAccountTransactions(supabase: SupabaseClient, contaId?: string): Promise<BalanceTx[]> {
-    return fetchAll<BalanceTx>((from, to) => {
-        let query = supabase
-            .from('transacoes')
-            .select(BALANCE_TX_COLUMNS)
-            .not('conta_id', 'is', null)
-            .order('id')
-            .range(from, to)
-        if (contaId) query = query.eq('conta_id', contaId)
-        return query
-    })
+function assertUuid(id: string) {
+    if (!UUID_RE.test(id)) throw new Error('Identificador de conta inválido')
 }
 
-export interface StatementTx extends BalanceTx {
-    id: string
-    descricao: string
-    categoria: { nome: string } | null
+/** Transferências e movimentos de cofrinho que tocam contas (de uma conta, se informada). */
+async function fetchNonTransactionMovements(supabase: SupabaseClient, contaId?: string): Promise<StatementTx[]> {
+    if (contaId) assertUuid(contaId)
+
+    const [transfers, cofrinho] = await Promise.all([
+        fetchAll<TransferRow>((from, to) => {
+            let query = supabase
+                .from('transferencias')
+                .select('id, conta_origem_id, conta_destino_id, valor, data, descricao')
+                .order('id')
+                .range(from, to)
+            if (contaId) query = query.or(`conta_origem_id.eq.${contaId},conta_destino_id.eq.${contaId}`)
+            return query
+        }),
+        fetchAll<CofrinhoMovRow>((from, to) => {
+            let query = supabase
+                .from('cofrinho_transacoes')
+                .select('id, tipo, valor, data, conta_id, cofrinho:cofrinhos(nome)')
+                .not('conta_id', 'is', null)
+                .order('id')
+                .range(from, to)
+            if (contaId) query = query.eq('conta_id', contaId)
+            return query
+        })
+    ])
+
+    return [...transfersToMovements(transfers, contaId), ...cofrinhoToMovements(cofrinho)]
 }
 
-/** Transações de uma conta com dados de exibição (para o extrato). */
-export function fetchStatementTransactions(supabase: SupabaseClient, contaId: string): Promise<StatementTx[]> {
-    return fetchAll<StatementTx>((from, to) =>
-        supabase
-            .from('transacoes')
-            .select(`${BALANCE_TX_COLUMNS}, descricao, categoria:categorias(nome)`)
-            .eq('conta_id', contaId)
-            .order('id')
-            .range(from, to)
-    )
+/** Todos os movimentos vinculados a contas (transações liquidadas/em aberto + transferências + cofrinho). */
+export async function fetchAccountTransactions(supabase: SupabaseClient, contaId?: string): Promise<BalanceTx[]> {
+    if (contaId) assertUuid(contaId)
+    const [txs, extras] = await Promise.all([
+        fetchAll<BalanceTx>((from, to) => {
+            let query = supabase
+                .from('transacoes')
+                .select(BALANCE_TX_COLUMNS)
+                .not('conta_id', 'is', null)
+                .order('id')
+                .range(from, to)
+            if (contaId) query = query.eq('conta_id', contaId)
+            return query
+        }),
+        fetchNonTransactionMovements(supabase, contaId)
+    ])
+    return [...txs, ...extras]
+}
+
+/** Movimentos de uma conta com dados de exibição (para o extrato). */
+export async function fetchStatementTransactions(supabase: SupabaseClient, contaId: string): Promise<StatementTx[]> {
+    assertUuid(contaId)
+    const [txs, extras] = await Promise.all([
+        fetchAll<Omit<StatementTx, 'origem' | 'ref_id'>>((from, to) =>
+            supabase
+                .from('transacoes')
+                .select(`${BALANCE_TX_COLUMNS}, descricao, categoria:categorias(nome)`)
+                .eq('conta_id', contaId)
+                .order('id')
+                .range(from, to)
+        ),
+        fetchNonTransactionMovements(supabase, contaId)
+    ])
+    return [
+        ...txs.map(tx => ({ ...tx, origem: 'transacao' as const, ref_id: tx.id })),
+        ...extras
+    ]
 }
 
 /** Quantidade de transações liquidadas sem conta e fora de cartão (não entram em nenhum saldo). */
@@ -254,7 +404,7 @@ export interface BalanceOverview<A extends BalanceAccount> {
     transactions: BalanceTx[]
 }
 
-/** Contas com saldo atual + saldo disponível, com 2 queries no total. */
+/** Contas com saldo atual + saldo disponível. */
 export async function fetchBalanceOverview<A extends BalanceAccount = BalanceAccount>(
     supabase: SupabaseClient,
     asOf: string = todayISO()

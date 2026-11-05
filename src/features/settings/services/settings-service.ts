@@ -19,6 +19,8 @@ export type BankAccount = {
     instituicao: string | null
     tipo: 'corrente' | 'poupanca' | 'investimento' | 'dinheiro' | 'outros'
     saldo_inicial: number
+    /** Data de referência do saldo inicial (YYYY-MM-DD). Movimentos anteriores são ignorados. */
+    data_saldo_inicial: string | null
     cor: string | null
     created_at: string
 }

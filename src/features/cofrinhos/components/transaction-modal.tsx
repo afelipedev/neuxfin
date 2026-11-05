@@ -23,8 +23,20 @@ import {
     FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 import { useCofrinhoActions } from "../hooks/use-cofrinhos"
 import { Cofrinho } from "../services/cofrinhos"
+import { BankAccount, settingsService } from "@/features/settings/services/settings-service"
+import { todayISO } from "@/features/bank-accounts/services/balances"
+import { parseLocalDate } from "@/lib/utils"
+
+const NO_ACCOUNT = "__none__"
 
 const formSchema = z.object({
     valor: z.string().min(1, {
@@ -33,6 +45,7 @@ const formSchema = z.object({
     data: z.string().min(1, {
         message: "A data é obrigatória.",
     }),
+    conta_id: z.string(),
 })
 
 interface TransactionModalProps {
@@ -45,22 +58,27 @@ interface TransactionModalProps {
 
 export function TransactionModal({ open, onOpenChange, cofrinho, tipo, onSuccess }: TransactionModalProps) {
     const { addTransaction, loading } = useCofrinhoActions()
+    const [accounts, setAccounts] = useState<BankAccount[]>([])
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             valor: "",
-            data: new Date().toISOString().split('T')[0],
+            data: todayISO(),
+            conta_id: NO_ACCOUNT,
         },
     })
 
     useEffect(() => {
-        if (open) {
-            form.reset({
-                valor: "",
-                data: new Date().toISOString().split('T')[0],
+        if (!open) return
+        form.reset({ valor: "", data: todayISO(), conta_id: NO_ACCOUNT })
+        settingsService.getBankAccounts()
+            .then(list => {
+                setAccounts(list)
+                // Sugere a primeira conta: o dinheiro do cofrinho sai/volta de uma conta real
+                if (list.length > 0) form.setValue("conta_id", list[0].id)
             })
-        }
+            .catch(console.error)
     }, [open, form])
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -71,11 +89,16 @@ export function TransactionModal({ open, onOpenChange, cofrinho, tipo, onSuccess
             return
         }
 
+        // Meio-dia local evita que a data "volte" um dia ao converter para UTC (timestamptz)
+        const dataMov = parseLocalDate(values.data)
+        dataMov.setHours(12)
+
         const data = {
             cofrinho_id: cofrinho.id,
             tipo,
             valor: valorNum,
-            data: values.data,
+            data: dataMov.toISOString(),
+            conta_id: values.conta_id === NO_ACCOUNT ? null : values.conta_id,
         }
 
         const success = await addTransaction(data)
@@ -136,10 +159,32 @@ export function TransactionModal({ open, onOpenChange, cofrinho, tipo, onSuccess
                             )}
                         />
 
+                        <FormField
+                            control={form.control}
+                            name="conta_id"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{tipo === 'aporte' ? 'Sair da conta' : 'Creditar na conta'}</FormLabel>
+                                    <Select value={field.value} onValueChange={field.onChange}>
+                                        <FormControl>
+                                            <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {accounts.map(acc => (
+                                                <SelectItem key={acc.id} value={acc.id}>{acc.nome}</SelectItem>
+                                            ))}
+                                            <SelectItem value={NO_ACCOUNT}>Não movimentar conta</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
                         {tipo === 'resgate' && (
                             <div className="bg-orange-500/10 p-3 rounded-lg flex gap-2 text-xs text-orange-600 font-medium">
                                 <Info className="h-4 w-4 shrink-0" />
-                                <p>O resgate será descontado do saldo deste cofrinho.</p>
+                                <p>O resgate será descontado do saldo deste cofrinho{form.watch("conta_id") !== NO_ACCOUNT ? " e creditado na conta escolhida" : ""}.</p>
                             </div>
                         )}
 

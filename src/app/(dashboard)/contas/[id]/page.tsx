@@ -23,6 +23,8 @@ import { accountIconMap } from "@/features/bank-accounts/components/bank-account
 import { deriveStatus } from "@/features/bank-accounts/services/balances"
 import { SettleTransactionDialog } from "@/features/transactions/components/settle-transaction-dialog"
 import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
+import { TransferDialog } from "@/features/bank-accounts/components/transfer-dialog"
+import { DeleteTransferButton } from "@/features/bank-accounts/components/delete-transfer-button"
 
 const formatDay = (iso: string) => format(parseLocalDate(iso), "dd MMM", { locale: ptBR }).toUpperCase()
 
@@ -99,6 +101,8 @@ export default function AccountStatementPage() {
                     </div>
                 </div>
 
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
+                <TransferDialog defaultOrigemId={id} />
                 <div className="flex items-center bg-secondary/30 dark:bg-zinc-100/5 rounded-xl border border-border px-2 w-full sm:w-auto justify-between">
                     <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => shiftMonth(-1)} aria-label="Mês anterior">
                         <ChevronLeft className="h-3 w-3" />
@@ -109,6 +113,7 @@ export default function AccountStatementPage() {
                     <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => shiftMonth(1)} aria-label="Próximo mês">
                         <ChevronRight className="h-3 w-3" />
                     </Button>
+                </div>
                 </div>
             </div>
 
@@ -134,17 +139,18 @@ export default function AccountStatementPage() {
                                     <TableHead className="font-black text-[10px] uppercase tracking-widest">Descrição</TableHead>
                                     <TableHead className="font-black text-[10px] uppercase tracking-widest hidden md:table-cell">Categoria</TableHead>
                                     <TableHead className="font-black text-[10px] uppercase tracking-widest text-right">Valor</TableHead>
-                                    <TableHead className="font-black text-[10px] uppercase tracking-widest text-right px-6">Saldo</TableHead>
+                                    <TableHead className="font-black text-[10px] uppercase tracking-widest text-right">Saldo</TableHead>
+                                    <TableHead className="w-12 px-4"><span className="sr-only">Ações</span></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center py-10 text-[10px] uppercase font-black tracking-widest opacity-50 italic">Carregando...</TableCell>
+                                        <TableCell colSpan={6} className="text-center py-10 text-[10px] uppercase font-black tracking-widest opacity-50 italic">Carregando...</TableCell>
                                     </TableRow>
                                 ) : extrato.pageItems.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center py-10 text-[10px] uppercase font-black tracking-widest opacity-50 italic">
+                                        <TableCell colSpan={6} className="text-center py-10 text-[10px] uppercase font-black tracking-widest opacity-50 italic">
                                             Nenhuma movimentação liquidada neste mês
                                         </TableCell>
                                     </TableRow>
@@ -156,8 +162,11 @@ export default function AccountStatementPage() {
                                         <TableCell className={cn("text-right font-black text-sm tabular-nums", valor_assinado >= 0 ? "text-brand-2" : "text-rose-500")}>
                                             {valor_assinado >= 0 ? "+" : "−"} {formatCurrency(Math.abs(valor_assinado))}
                                         </TableCell>
-                                        <TableCell className={cn("text-right px-6 text-sm font-semibold tabular-nums", saldo_apos >= 0 ? "text-foreground" : "text-rose-500")}>
+                                        <TableCell className={cn("text-right text-sm font-semibold tabular-nums", saldo_apos >= 0 ? "text-foreground" : "text-rose-500")}>
                                             {formatCurrency(saldo_apos)}
+                                        </TableCell>
+                                        <TableCell className="px-4 text-right">
+                                            {tx.origem === "transferencia" && <DeleteTransferButton transferId={tx.ref_id} />}
                                         </TableCell>
                                     </TableRow>
                                 ))}

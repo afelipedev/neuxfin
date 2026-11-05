@@ -44,7 +44,16 @@ Each feature groups `components/`, `hooks/`, `services/` (and sometimes `context
 - `api/agent/process/route.ts`: non-streaming endpoint (`generateText`) for external automations (WhatsApp text/audio transcripts). It receives `{ message, userId }` and uses a **service-role** Supabase client, so it bypasses RLS and only calls `addTransactionCore`. Callers must send `Authorization: Bearer <AGENT_API_SECRET>`. The check fails closed (401) when the env var is missing.
 
 ### Data Model
-Tables in use: `transacoes`, `categorias`, `contas_bancarias`, `cartoes_credito`, `assinaturas`, `cofrinhos`, `cofrinho_transacoes`, `perfis`, plus the `avatars` storage bucket. Rows are scoped by `usuario_id` with RLS. There is no migrations folder; the only checked-in schema is `src/features/cofrinhos/database.sql`.
+Tables in use: `transacoes`, `categorias`, `contas_bancarias`, `cartoes_credito`, `assinaturas`, `cofrinhos`, `cofrinho_transacoes`, `transferencias`, `perfis`, plus the `avatars` storage bucket. Rows are scoped by `usuario_id` with RLS (policies are `to authenticated` with `(select auth.uid())` and `WITH CHECK`).
+
+Migrations from 2026-11 onward live in `supabase/migrations/` and their filenames match the remote migration history (earlier ones exist only in Supabase). Integrity rules enforced in the database:
+- `transacoes`: `status` ∈ liquidado/pendente/atrasado, `valor > 0`, `liquidado ⇔ data_pagamento IS NOT NULL`, and `conta_id`/`cartao_id`/`categoria_id` must belong to the same user (trigger).
+- Deleting a bank account with linked transactions is blocked (trigger). Transfers and cofrinho movements use `ON DELETE RESTRICT`.
+- Deleting a cofrinho with balance and account-linked movements is blocked (trigger).
+- Cofrinho aporte/resgate must go through the RPC `registrar_movimento_cofrinho` (atomic, row lock, balance check). Never update `cofrinhos.saldo_atual` from the client.
+- Installments are created in a single INSERT, with the parent id generated client-side. Deleting the parent installment alone re-links the others first, because the `transacao_pai_id` FK cascades.
+
+**Supabase MCP:** `apply_migration` auto-declines statements it considers destructive (`DROP ...`) in this environment. Use `ALTER POLICY`/`ALTER VIEW`/`CREATE OR REPLACE`/`REVOKE`, or add a new constraint instead of dropping the old one. Test risky SQL with `execute_sql` inside `begin; ... rollback;`.
 
 `transacoes`:
 - `tipo_transacao`: `'receita' | 'despesa'`. `tipo`: `'PF' | 'PJ'`
@@ -54,7 +63,8 @@ Tables in use: `transacoes`, `categorias`, `contas_bancarias`, `cartoes_credito`
 - FKs: `categoria_id`, `conta_id`, `cartao_id`
 
 ### Balance rules (Saldo)
-- **Account balance at date D** = `saldo_inicial` + liquidated receitas − liquidated despesas of that account whose `data_pagamento` (fallback `data_vencimento`) ≤ D. Balances are computed, never stored.
+- **Account balance at date D** = `saldo_inicial` + liquidated receitas − liquidated despesas of that account whose `data_pagamento` (fallback `data_vencimento`) ≤ D, ± transfers (`transferencias`: destination +, origin −), ± cofrinho movements with `conta_id` (resgate +, aporte −). When `data_saldo_inicial` is set, movements before it are ignored. Balances are computed, never stored.
+- Transfers are not receitas/despesas and never appear in the monthly totals.
 - **Saldo Disponível** = sum of all account balances as of today. It does not depend on the month selected in the dashboard.
 - **Saldo previsto (end of month)** = Saldo Disponível + pending receitas − pending/overdue despesas with `data_vencimento` ≤ end of the selected month (only those linked to an account).
 - Month cards (receitas/despesas do mês) use `data_vencimento` (competência). "Resultado do mês" = receitas − despesas of the month.

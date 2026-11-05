@@ -55,8 +55,9 @@ export function useAccountStatement(accountId: string, month: number, year: numb
         const saldoInicial = account?.saldo_inicial ?? 0
         const today = todayISO()
 
-        const statement = buildStatement(saldoInicial, transactions, from, to)
-        const saldoAtual = computeAccountBalance(saldoInicial, transactions, today)
+        const desde = account?.data_saldo_inicial ?? null
+        const statement = buildStatement(saldoInicial, transactions, from, to, desde)
+        const saldoAtual = computeAccountBalance(saldoInicial, transactions, today, desde)
         const emAberto = transactions
             .filter(tx => tx.status !== 'liquidado' && tx.data_vencimento.slice(0, 10) <= to
                 && (tx.data_vencimento.slice(0, 10) >= from || deriveStatus(tx, today) === 'atrasado'))

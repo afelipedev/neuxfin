@@ -211,81 +211,57 @@ export async function createTransaction(transaction: Omit<Transaction, 'id' | 'c
 }
 
 /**
- * Cria transação parcelada
+ * Cria transação parcelada em um único INSERT (atômico: ou todas as parcelas
+ * são gravadas, ou nenhuma). O id da parcela 1 é gerado no client para que as
+ * demais já referenciem transacao_pai_id no mesmo comando.
+ * O valor é dividido em centavos; a diferença de arredondamento fica na parcela 1.
  */
 export async function createParceledTransaction(
     transaction: Omit<Transaction, 'id' | 'created_at' | 'parcela_atual' | 'total_parcelas'>,
     totalParcelas: number
 ) {
-    // Pegar o usuário autenticado
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
         throw new Error('Usuário não autenticado')
     }
 
-    const valorTotal = Number(transaction.valor)
-    const valorParcelaBase = Math.floor((valorTotal / totalParcelas) * 100) / 100
-    const resto = Number((valorTotal - (valorParcelaBase * totalParcelas)).toFixed(2))
+    const totalCents = toCents(transaction.valor)
+    const baseCents = Math.floor(totalCents / totalParcelas)
+    const restoCents = totalCents - baseCents * totalParcelas
 
-    const transacoes = []
     const dataBase = parseLocalDate(transaction.data_vencimento)
+    const paiId = crypto.randomUUID()
 
-    // Criar transação pai (primeira parcela)
-    const { data: transacaoPai, error: errorPai } = await supabase
+    const transacoes = Array.from({ length: totalParcelas }, (_, idx) => {
+        const numero = idx + 1
+        const isPai = numero === 1
+        // Mesmo dia nos meses seguintes, limitado ao último dia do mês (31 → 28/29/30)
+        const vencimento = dateInMonthClamped(dataBase.getFullYear(), dataBase.getMonth() + idx, dataBase.getDate())
+
+        return {
+            ...transaction,
+            ...(isPai ? { id: paiId } : {}),
+            usuario_id: user.id,
+            valor: fromCents(isPai ? baseCents + restoCents : baseCents),
+            parcela_atual: numero,
+            total_parcelas: totalParcelas,
+            data_vencimento: formatDateToISO(vencimento),
+            descricao: `${transaction.descricao} (${numero}/${totalParcelas})`,
+            transacao_pai_id: isPai ? null : paiId,
+            // Só a 1ª parcela herda o status escolhido; as futuras nascem pendentes
+            status: isPai ? transaction.status : ('pendente' as const),
+            data_pagamento: isPai ? transaction.data_pagamento : null,
+        }
+    })
+
+    const { data, error } = await supabase
         .from('transacoes')
-        .insert([{
-            ...transaction,
-            usuario_id: user.id,
-            valor: Number((valorParcelaBase + resto).toFixed(2)),
-            parcela_atual: 1,
-            total_parcelas: totalParcelas,
-            descricao: `${transaction.descricao} (1/${totalParcelas})`
-        }])
+        .insert(transacoes)
         .select()
-        .single()
 
-    if (errorPai) throw errorPai
-
-    transacoes.push(transacaoPai)
-
-    // Criar parcelas subsequentes
-    for (let i = 2; i <= totalParcelas; i++) {
-        // Calcular data: adiciona meses à data base
-        const dataVencimento = new Date(dataBase)
-        dataVencimento.setMonth(dataBase.getMonth() + (i - 1))
-
-        // Ajuste para meses com menos dias (previne pular mês se hoje for dia 31)
-        if (dataVencimento.getDate() !== dataBase.getDate()) {
-            dataVencimento.setDate(0)
-        }
-
-        const parcela = {
-            ...transaction,
-            usuario_id: user.id,
-            valor: valorParcelaBase,
-            parcela_atual: i,
-            total_parcelas: totalParcelas,
-            data_vencimento: formatDateToISO(dataVencimento),
-            data_pagamento: null, // Parcelas futuras sempre sem pagamento
-            descricao: `${transaction.descricao} (${i}/${totalParcelas})`,
-            transacao_pai_id: transacaoPai.id,
-            status: 'pendente' as const
-        }
-
-        transacoes.push(parcela)
-    }
-
-    // Inserir parcelas em lote (exceto a primeira que já foi inserida)
-    if (transacoes.length > 1) {
-        const { error: errorParcelas } = await supabase
-            .from('transacoes')
-            .insert(transacoes.slice(1))
-
-        if (errorParcelas) throw errorParcelas
-    }
-
-    return transacoes
+    if (error) throw error
+    return data as Transaction[]
 }
 
 /**
@@ -361,20 +337,36 @@ export async function updateTransaction(id: string, updates: Partial<Transaction
 }
 
 /**
- * Exclui uma transação
+ * Exclui uma única transação.
+ * Se ela for a parcela "pai" de um parcelamento, as demais parcelas são
+ * re-vinculadas à próxima parcela antes da exclusão — sem isso o FK
+ * transacao_pai_id (ON DELETE CASCADE) apagaria o parcelamento inteiro.
  */
 export async function deleteTransaction(id: string) {
-    // Verificar se é uma transação parcelada
-    const { data: transaction } = await supabase
+    const { data: filhas, error: filhasError } = await supabase
         .from('transacoes')
-        .select('total_parcelas, transacao_pai_id')
-        .eq('id', id)
-        .single()
+        .select('id')
+        .eq('transacao_pai_id', id)
+        .order('parcela_atual', { ascending: true })
 
-    // Se for parcelada, perguntar se quer excluir todas
-    if (transaction?.total_parcelas && transaction.total_parcelas > 1) {
-        // Por enquanto, excluir apenas a transação específica
-        // TODO: Implementar modal de confirmação para excluir todas as parcelas
+    if (filhasError) throw filhasError
+
+    if (filhas && filhas.length > 0) {
+        const novoPaiId = filhas[0].id
+
+        const { error: promoteError } = await supabase
+            .from('transacoes')
+            .update({ transacao_pai_id: null })
+            .eq('id', novoPaiId)
+        if (promoteError) throw promoteError
+
+        if (filhas.length > 1) {
+            const { error: relinkError } = await supabase
+                .from('transacoes')
+                .update({ transacao_pai_id: novoPaiId })
+                .eq('transacao_pai_id', id)
+            if (relinkError) throw relinkError
+        }
     }
 
     const { error } = await supabase
@@ -386,7 +378,7 @@ export async function deleteTransaction(id: string) {
 }
 
 /**
- * Exclui todas as parcelas de uma transação parcelada
+ * Exclui todas as parcelas de uma transação parcelada (pai + filhas).
  */
 export async function deleteAllInstallments(transacaoPaiId: string) {
     const { error } = await supabase

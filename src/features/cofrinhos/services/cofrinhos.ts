@@ -20,6 +20,8 @@ export interface CofrinhoTransaction {
     tipo: 'aporte' | 'resgate'
     valor: number
     data: string
+    /** Conta debitada (aporte) ou creditada (resgate). Nulo = não movimenta conta. */
+    conta_id: string | null
     created_at: string
 }
 
@@ -77,37 +79,21 @@ export async function deleteCofrinho(id: string) {
     if (error) throw error
 }
 
+/**
+ * Registra aporte/resgate de forma atômica no banco (RPC registrar_movimento_cofrinho):
+ * grava o movimento, atualiza o saldo do cofrinho com lock de linha e valida o
+ * saldo no resgate. Com conta_id, o aporte sai da conta e o resgate entra nela.
+ */
 export async function addCofrinhoTransaction(transaction: Omit<CofrinhoTransaction, 'id' | 'created_at'>) {
-    // 1. Inserir a transação
-    const { data, error: txError } = await supabase
-        .from('cofrinho_transacoes')
-        .insert([transaction])
-        .select()
-        .single()
+    const { data, error } = await supabase.rpc('registrar_movimento_cofrinho', {
+        p_cofrinho_id: transaction.cofrinho_id,
+        p_tipo: transaction.tipo,
+        p_valor: transaction.valor,
+        p_conta_id: transaction.conta_id,
+        p_data: transaction.data
+    })
 
-    if (txError) throw txError
-
-    // 2. Buscar o saldo atual do cofrinho
-    const { data: cofrinho, error: fetchError } = await supabase
-        .from('cofrinhos')
-        .select('saldo_atual')
-        .eq('id', transaction.cofrinho_id)
-        .single()
-
-    if (fetchError) throw fetchError
-
-    // 3. Atualizar o saldo do cofrinho
-    const novoSaldo = transaction.tipo === 'aporte'
-        ? Number(cofrinho.saldo_atual) + Number(transaction.valor)
-        : Number(cofrinho.saldo_atual) - Number(transaction.valor)
-
-    const { error: updateError } = await supabase
-        .from('cofrinhos')
-        .update({ saldo_atual: novoSaldo })
-        .eq('id', transaction.cofrinho_id)
-
-    if (updateError) throw updateError
-
+    if (error) throw error
     return data as CofrinhoTransaction
 }
 
