@@ -1,5 +1,6 @@
 "use client"
 
+import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
 import * as React from "react"
 import { Plus, Landmark, Trash2, Edit, CreditCard, Wallet, Banknote } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -40,10 +41,15 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { settingsService, BankAccount } from "../services/settings-service"
+import { fetchBalanceOverview } from "@/features/bank-accounts/services/balances"
+import { createClient } from "@/lib/supabase/client"
+import { formatCurrency } from "@/lib/utils"
+import Link from "next/link"
 import { toast } from "sonner"
 
 export function AccountsSettings() {
-    const [accounts, setAccounts] = React.useState<BankAccount[]>([])
+    const [accounts, setAccounts] = React.useState<Array<BankAccount & { saldo_atual: number }>>([])
+    const paged = usePaginatedList(accounts, 10)
     const [loading, setLoading] = React.useState(true)
     const [isDialogOpen, setIsDialogOpen] = React.useState(false)
     const [editingAccount, setEditingAccount] = React.useState<BankAccount | null>(null)
@@ -59,7 +65,7 @@ export function AccountsSettings() {
 
     const fetchAccounts = React.useCallback(async () => {
         try {
-            const data = await settingsService.getBankAccounts()
+            const { accounts: data } = await fetchBalanceOverview<BankAccount>(createClient())
             setAccounts(data)
         } catch (error) {
             console.error(error)
@@ -241,28 +247,29 @@ export function AccountsSettings() {
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader>
-                            <TableRow className="border-none hover:bg-transparent text-muted-foreground">
+                            <TableRow>
                                 <TableHead className="font-medium text-xs h-10 px-6">Nome / Instituição</TableHead>
                                 <TableHead className="font-medium text-xs h-10">Tipo</TableHead>
-                                <TableHead className="font-medium text-xs h-10 text-right">Saldo Inicial</TableHead>
+                                <TableHead className="font-medium text-xs h-10 text-right hidden sm:table-cell">Saldo Inicial</TableHead>
+                                <TableHead className="font-medium text-xs h-10 text-right">Saldo Atual</TableHead>
                                 <TableHead className="font-medium text-xs h-10 text-right px-6">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
+                                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
                                         Carregando contas...
                                     </TableCell>
                                 </TableRow>
                             ) : accounts.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
+                                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
                                         Nenhuma conta cadastrada.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                accounts.map((account) => (
+                                paged.pageItems.map((account) => (
                                     <TableRow key={account.id} className="border-neux-1/5 hover:bg-zinc-900/5 dark:hover:bg-zinc-100/5 transition-colors">
                                         <TableCell className="font-medium px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -283,8 +290,13 @@ export function AccountsSettings() {
                                                 {account.tipo}
                                             </Badge>
                                         </TableCell>
+                                        <TableCell className="text-right font-mono text-muted-foreground hidden sm:table-cell">
+                                            {formatCurrency(Number(account.saldo_inicial))}
+                                        </TableCell>
                                         <TableCell className="text-right font-mono font-bold">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(account.saldo_inicial)}
+                                            <Link href={`/contas/${account.id}`} className={account.saldo_atual < 0 ? "text-rose-500 hover:underline" : "hover:underline"}>
+                                                {formatCurrency(account.saldo_atual)}
+                                            </Link>
                                         </TableCell>
                                         <TableCell className="text-right px-6">
                                             <div className="flex justify-end gap-1">
@@ -311,6 +323,13 @@ export function AccountsSettings() {
                             )}
                         </TableBody>
                     </Table>
+                    <DataTablePagination
+                        page={paged.page}
+                        pageSize={paged.pageSize}
+                        totalCount={paged.totalCount}
+                        onPageChange={paged.setPage}
+                        onPageSizeChange={paged.setPageSize}
+                    />
                 </CardContent>
             </Card>
 

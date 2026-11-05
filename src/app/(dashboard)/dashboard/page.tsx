@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Plus, Download, Calendar, Search, ChevronRight, ArrowUpCircle, ArrowDownCircle, ChevronLeft } from "lucide-react"
+import { Plus, Download, Calendar, Search, ChevronRight, ArrowUpCircle, ArrowDownCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     SummaryCards,
@@ -25,6 +25,7 @@ import { useTransactions, useDashboardStats, useCashFlowData } from "@/features/
 import { TransactionForm } from "@/features/transactions/components/transaction-form"
 import { AllTransactionsModal } from "@/features/transactions/components/all-transactions-modal"
 import { BankAccountsBalance } from "@/features/bank-accounts/components/bank-accounts-balance"
+import { DataTablePagination } from "@/components/data-table-pagination"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 // import * as XLSX from 'xlsx' // Removido para import dinâmico em handleExport
@@ -34,22 +35,29 @@ export default function DashboardPage() {
     const [month, setMonth] = React.useState(new Date().getMonth() + 1)
     const [year, setYear] = React.useState(new Date().getFullYear())
     const [page, setPage] = React.useState(1)
+    const [pageSize, setPageSize] = React.useState(10)
 
     React.useEffect(() => {
         setPage(1)
     }, [month, year])
 
+    // Navega entre meses ajustando o ano na virada (Dez → Jan / Jan → Dez)
+    const shiftMonth = (delta: number) => {
+        const target = new Date(year, month - 1 + delta, 1)
+        setMonth(target.getMonth() + 1)
+        setYear(target.getFullYear())
+    }
+
     const filters = React.useMemo(() => ({
         month,
         year,
         page,
-        pageSize: 10
-    }), [month, year, page])
+        pageSize
+    }), [month, year, page, pageSize])
     const { transactions, totalCount, loading: loadingTransactions, error } = useTransactions(filters)
     const { stats, loading: loadingStats } = useDashboardStats(filters)
     const { data: cashFlowData, loading: loadingCashFlow } = useCashFlowData(12, true)
 
-    const totalPages = Math.ceil(totalCount / 10)
 
     const handleExport = async () => {
         const XLSX = await import('xlsx')
@@ -90,7 +98,8 @@ export default function DashboardPage() {
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 px-2 text-[10px] uppercase font-black tracking-widest"
-                                onClick={() => setMonth(prev => prev === 1 ? 12 : prev - 1)}
+                                onClick={() => shiftMonth(-1)}
+                                aria-label="Mês anterior"
                             >
                                 <ChevronRight className="h-3 w-3 rotate-180" />
                             </Button>
@@ -101,7 +110,8 @@ export default function DashboardPage() {
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 px-2 text-[10px] uppercase font-black tracking-widest"
-                                onClick={() => setMonth(prev => prev === 12 ? 1 : prev + 1)}
+                                onClick={() => shiftMonth(1)}
+                                aria-label="Próximo mês"
                             >
                                 <ChevronRight className="h-3 w-3" />
                             </Button>
@@ -172,7 +182,7 @@ export default function DashboardPage() {
                     <CardContent className="px-0 pt-0">
                         <Table>
                             <TableHeader>
-                                <TableRow className="border-none hover:bg-transparent text-muted-foreground/30">
+                                <TableRow>
                                     <TableHead className="font-black text-[10px] uppercase tracking-widest h-12 px-6">Descrição</TableHead>
                                     <TableHead className="font-black text-[10px] uppercase tracking-widest h-12 hidden sm:table-cell">Tipo</TableHead>
                                     <TableHead className="font-black text-[11px] uppercase tracking-widest h-12 hidden md:table-cell">Categoria</TableHead>
@@ -228,51 +238,14 @@ export default function DashboardPage() {
                             </TableBody>
                         </Table>
 
-                        {/* Pagination Area */}
-                        {!loadingTransactions && totalCount > 10 && (
-                            <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-                                <div className="text-[10px] uppercase font-black tracking-widest text-muted-foreground/50">
-                                    Mostrando {((page - 1) * 10) + 1} até {Math.min(page * 10, totalCount)} de {totalCount}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                                        disabled={page === 1}
-                                        className="h-8 w-8 rounded-xl glass-card border-none hover:bg-brand-1 hover:text-zinc-950 disabled:opacity-30 transition-all font-display"
-                                    >
-                                        <ChevronLeft className="h-4 w-4" />
-                                    </Button>
-                                    <div className="flex items-center gap-1">
-                                        {[...Array(totalPages)].map((_, i) => (
-                                            <Button
-                                                key={i + 1}
-                                                variant={page === i + 1 ? "default" : "outline"}
-                                                size="icon"
-                                                onClick={() => setPage(i + 1)}
-                                                className={cn(
-                                                    "h-8 w-8 rounded-xl border-none transition-all text-[11px] font-black font-display",
-                                                    page === i + 1
-                                                        ? "bg-brand-1 text-zinc-950 shadow-lg shadow-brand-1/20"
-                                                        : "glass-card hover:bg-brand-1/10 text-muted-foreground"
-                                                )}
-                                            >
-                                                {i + 1}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                        disabled={page === totalPages}
-                                        className="h-8 w-8 rounded-xl glass-card border-none hover:bg-brand-1 hover:text-zinc-950 disabled:opacity-30 transition-all font-display"
-                                    >
-                                        <ChevronRight className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
+                        {!loadingTransactions && (
+                            <DataTablePagination
+                                page={page}
+                                pageSize={pageSize}
+                                totalCount={totalCount}
+                                onPageChange={setPage}
+                                onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+                            />
                         )}
                     </CardContent>
                 </Card>

@@ -8,6 +8,8 @@ import {
     TransactionStats,
     TransactionFilters,
     CashFlowData,
+    DashboardStats,
+    EMPTY_DASHBOARD_STATS,
     createTransaction,
     createParceledTransaction,
     updateTransaction,
@@ -101,14 +103,7 @@ export function useTransactionStats(filters: TransactionFilters = {}) {
 }
 
 export function useDashboardStats(filters: { month?: number, year?: number } = {}) {
-    const [stats, setStats] = useState({
-        total_receitas: 0,
-        total_receitas_recebidas: 0,
-        total_despesas: 0,
-        total_despesas_pagas: 0,
-        total_despesas_pendentes: 0,
-        saldo_atual: 0
-    })
+    const [stats, setStats] = useState<DashboardStats>(EMPTY_DASHBOARD_STATS)
     const [loading, setLoading] = useState(true)
 
     // Usar o contexto global para detectar mudanças em outras telas
@@ -245,11 +240,12 @@ export function useTransactionActions() {
     const updateStatus = useCallback(async (
         id: string,
         status: 'liquidado' | 'pendente' | 'atrasado',
-        dataPagamento?: string
+        dataPagamento?: string,
+        contaId?: string | null
     ) => {
         try {
             setLoading(true)
-            await updateTransactionStatus(id, status, dataPagamento)
+            await updateTransactionStatus(id, status, dataPagamento, contaId)
 
             const statusText = {
                 liquidado: 'liquidada',

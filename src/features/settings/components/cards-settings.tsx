@@ -1,5 +1,6 @@
 "use client"
 
+import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
 import * as React from "react"
 import { Plus, CreditCard, Trash2, Edit, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -44,6 +45,7 @@ import { toast } from "sonner"
 
 export function CardsSettings() {
     const [cards, setCards] = React.useState<ICreditCard[]>([])
+    const paged = usePaginatedList(cards, 10)
     const [loading, setLoading] = React.useState(true)
     const [isDialogOpen, setIsDialogOpen] = React.useState(false)
     const [editingCard, setEditingCard] = React.useState<ICreditCard | null>(null)
@@ -248,7 +250,7 @@ export function CardsSettings() {
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader>
-                            <TableRow className="border-none hover:bg-transparent text-muted-foreground">
+                            <TableRow>
                                 <TableHead className="font-medium text-xs h-10 px-6">Cartão</TableHead>
                                 <TableHead className="font-medium text-xs h-10">Bandeira</TableHead>
                                 <TableHead className="font-medium text-xs h-10">Datas (F/V)</TableHead>
@@ -270,7 +272,7 @@ export function CardsSettings() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                cards.map((card) => (
+                                paged.pageItems.map((card) => (
                                     <TableRow key={card.id} className="border-neux-1/5 hover:bg-zinc-900/5 dark:hover:bg-zinc-100/5 transition-colors">
                                         <TableCell className="font-medium px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -322,6 +324,13 @@ export function CardsSettings() {
                             )}
                         </TableBody>
                     </Table>
+                    <DataTablePagination
+                        page={paged.page}
+                        pageSize={paged.pageSize}
+                        totalCount={paged.totalCount}
+                        onPageChange={paged.setPage}
+                        onPageSizeChange={paged.setPageSize}
+                    />
                 </CardContent>
             </Card>
 

@@ -1,5 +1,6 @@
 "use client"
 
+import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
 import { ExternalLink, Repeat, ShieldCheck, Zap, CreditCard, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -69,6 +70,7 @@ function getIconColor(cor: string | null | undefined): string {
 
 export default function AssinaturasPage() {
     const { subscriptions, loading, refresh } = useSubscriptions()
+    const paged = usePaginatedList(subscriptions, 10)
     const { stats, loading: statsLoading, refresh: refreshStats } = useSubscriptionStats()
     const { generateExpenses, loading: actionLoading } = useSubscriptionActions()
 
@@ -227,9 +229,10 @@ export default function AssinaturasPage() {
                             <SubscriptionFormModal onSuccess={handleRefresh} />
                         </div>
                     ) : (
+                        <>
                         <Table>
                             <TableHeader>
-                                <TableRow className="border-none hover:bg-transparent text-muted-foreground">
+                                <TableRow>
                                     <TableHead className="font-medium text-xs h-10 px-6">Serviço / Ferramenta</TableHead>
                                     <TableHead className="font-medium text-xs h-10 hidden sm:table-cell">Frequência</TableHead>
                                     <TableHead className="font-medium text-xs h-10 hidden md:table-cell">Próximo Pagto</TableHead>
@@ -240,7 +243,7 @@ export default function AssinaturasPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {subscriptions.map((subscription) => (
+                                {paged.pageItems.map((subscription) => (
                                     <SubscriptionRow
                                         key={subscription.id}
                                         subscription={subscription}
@@ -249,6 +252,14 @@ export default function AssinaturasPage() {
                                 ))}
                             </TableBody>
                         </Table>
+                        <DataTablePagination
+                            page={paged.page}
+                            pageSize={paged.pageSize}
+                            totalCount={paged.totalCount}
+                            onPageChange={paged.setPage}
+                            onPageSizeChange={paged.setPageSize}
+                        />
+                        </>
                     )}
                 </CardContent>
             </Card>

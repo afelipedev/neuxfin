@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Filter, Download, Calendar, ArrowUpRight, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { Filter, Download, Calendar, ArrowUpRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
@@ -26,7 +26,10 @@ import { useCategories } from "@/features/settings/hooks/use-categories"
 import { ReplicateDialog } from "@/features/transactions/components/replicate-dialog"
 import { EditTransactionDialog } from "@/features/transactions/components/edit-transaction-dialog"
 import { DeleteTransactionDialog } from "@/features/transactions/components/delete-transaction-dialog"
+import { SettleTransactionDialog } from "@/features/transactions/components/settle-transaction-dialog"
+import { deriveStatus } from "@/features/bank-accounts/services/balances"
 import { Skeleton } from "@/components/ui/skeleton"
+import { DataTablePagination } from "@/components/data-table-pagination"
 import { cn, parseLocalDate } from "@/lib/utils"
 
 export default function ReceitasPage() {
@@ -39,7 +42,7 @@ export default function ReceitasPage() {
 
     // Estados de Paginação e Ordenação
     const [currentPage, setCurrentPage] = useState(1)
-    const [pageSize] = useState(10)
+    const [pageSize, setPageSize] = useState(10)
     const [sortBy, setSortBy] = useState('data_vencimento')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
@@ -105,7 +108,6 @@ export default function ReceitasPage() {
         return sortOrder === 'asc' ? <ArrowUp className="ml-2 h-3 w-3" /> : <ArrowDown className="ml-2 h-3 w-3" />
     }
 
-    const totalPages = Math.ceil(totalCount / pageSize)
     const percentLiquidado = stats.total > 0 ? (stats.liquidado / stats.total) * 100 : 0
 
     return (
@@ -328,12 +330,13 @@ export default function ReceitasPage() {
                                         <TableCell className="text-xs text-muted-foreground">
                                             {formatDate(transaction.data_vencimento)}
                                         </TableCell>
-                                        <TableCell>{getStatusBadge(transaction.status)}</TableCell>
+                                        <TableCell>{getStatusBadge(deriveStatus(transaction))}</TableCell>
                                         <TableCell className="text-right font-bold text-emerald-500 px-6">
                                             {formatCurrency(transaction.valor)}
                                         </TableCell>
                                         <TableCell className="text-right px-6">
                                             <div className="flex justify-end gap-1">
+                                                <SettleTransactionDialog transaction={transaction} onSuccess={refresh} />
                                                 <EditTransactionDialog transaction={transaction} onSuccess={refresh} />
                                                 <DeleteTransactionDialog transaction={transaction} onSuccess={refresh} />
                                             </div>
@@ -345,51 +348,14 @@ export default function ReceitasPage() {
                     </Table>
                 </CardContent>
 
-                {/* Paginação */}
-                {!loading && totalPages > 1 && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-neux-1/5">
-                        <p className="text-xs text-muted-foreground">
-                            Mostrando <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> a <span className="font-medium">{Math.min(currentPage * pageSize, totalCount)}</span> de <span className="font-medium">{totalCount}</span> resultados
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 w-8 p-0 border-none bg-zinc-900/5 dark:bg-zinc-100/10"
-                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                disabled={currentPage === 1}
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <div className="flex items-center gap-1 overflow-x-auto max-w-[60vw] sm:max-w-none">
-                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                                    <Button
-                                        key={page}
-                                        variant={currentPage === page ? "default" : "outline"}
-                                        size="sm"
-                                        className={cn(
-                                            "h-8 w-8 p-0 text-xs border-none",
-                                            currentPage === page
-                                                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                                : "bg-zinc-900/5 dark:bg-zinc-100/10 hover:bg-zinc-900/10 dark:hover:bg-zinc-100/20"
-                                        )}
-                                        onClick={() => setCurrentPage(page)}
-                                    >
-                                        {page}
-                                    </Button>
-                                ))}
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 w-8 p-0 border-none bg-zinc-900/5 dark:bg-zinc-100/10"
-                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                disabled={currentPage === totalPages}
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </div>
+                {!loading && (
+                    <DataTablePagination
+                        page={currentPage}
+                        pageSize={pageSize}
+                        totalCount={totalCount}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1) }}
+                    />
                 )}
             </Card>
         </div>

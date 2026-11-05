@@ -120,6 +120,10 @@ html {
   --sidebar-accent-foreground: #0f172a;
   --sidebar-border: #f1f5f9;
   --sidebar-ring: #26c8a6;
+
+  /* Cabeçalho de tabelas/listas */
+  --table-header: #e8edf3;
+  --table-header-foreground: #475569;
 }
 
 .dark {
@@ -152,6 +156,9 @@ html {
   --sidebar-accent-foreground: #fafafa;
   --sidebar-border: #18181b;
   --sidebar-ring: #26c8a6;
+
+  --table-header: #232327;
+  --table-header-foreground: #d4d4d8;
 }
 
 @layer base {
@@ -217,4 +224,21 @@ html {
   .glow-primary {
     @apply shadow-glow-primary;
   }
+}
+/*
+ * Cabeçalho das tabelas (shadcn <TableHeader> → data-slot="table-header").
+ * Fora de @layer de propósito: vale para todas as tabelas, mesmo com utilitários de cor nas células.
+ */
+[data-slot="table-header"] {
+  background-color: var(--table-header);
+}
+
+[data-slot="table-header"] tr,
+[data-slot="table-header"] tr:hover {
+  background-color: transparent;
+  border-color: var(--border);
+}
+
+[data-slot="table-header"] th {
+  color: var(--table-header-foreground);
 }

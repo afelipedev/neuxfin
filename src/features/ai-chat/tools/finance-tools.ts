@@ -1,6 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
-import { formatDateToISO, parseLocalDate } from '@/lib/utils'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { formatDateToISO } from '@/lib/utils'
+import {
+    computeProjectedBalance,
+    fetchBalanceOverview,
+    fromCents,
+    toCents
+} from '@/features/bank-accounts/services/balances'
 
 // --- Tool Schemas ---
 
@@ -29,40 +36,57 @@ export const addTransactionSchema = z.object({
 
 // --- Core Logic (Dependency Injection) ---
 
-export const getBalanceCore = async (supabase: any, month?: number, year?: number) => {
+/**
+ * Saldo para a IA: usa as mesmas regras do dashboard (features/bank-accounts/services/balances.ts).
+ * - saldo_disponivel: soma das contas hoje (independe do mês).
+ * - saldo_previsto: saldo disponível + lançamentos em aberto até o fim do mês.
+ * - mes: receitas/despesas do mês por vencimento (competência).
+ */
+export const getBalanceCore = async (supabase: SupabaseClient, month?: number, year?: number) => {
     const targetMonth = month || new Date().getMonth() + 1
     const targetYear = year || new Date().getFullYear()
 
     const startDate = formatDateToISO(new Date(targetYear, targetMonth - 1, 1))
     const endDate = formatDateToISO(new Date(targetYear, targetMonth, 0))
 
-    const { data: transactions, error } = await supabase
-        .from('transacoes')
-        .select('valor, tipo_transacao, status')
-        .gte('data_vencimento', startDate)
-        .lte('data_vencimento', endDate)
+    const [{ data: transactions, error }, overview] = await Promise.all([
+        supabase
+            .from('transacoes')
+            .select('valor, tipo_transacao, status')
+            .gte('data_vencimento', startDate)
+            .lte('data_vencimento', endDate),
+        fetchBalanceOverview<{ id: string; nome: string; saldo_inicial: number }>(supabase)
+    ])
 
     if (error) throw new Error(`Erro ao buscar saldo: ${error.message}`)
 
-    const stats = (transactions || []).reduce((acc: any, t: any) => {
-        const valor = Number(t.valor)
+    const mes = { receitas: 0, receitas_recebidas: 0, despesas: 0, despesas_pagas: 0 }
+    for (const t of (transactions || []) as Array<{ valor: number | string; tipo_transacao: string; status: string }>) {
+        const cents = toCents(t.valor)
         if (t.tipo_transacao === 'receita') {
-            if (t.status === 'liquidado') {
-                acc.receitas_recebidas += valor
-            }
+            mes.receitas += cents
+            if (t.status === 'liquidado') mes.receitas_recebidas += cents
         } else {
-            if (t.status === 'liquidado') {
-                acc.despesas_pagas += valor
-            }
+            mes.despesas += cents
+            if (t.status === 'liquidado') mes.despesas_pagas += cents
         }
-        return acc
-    }, { receitas_recebidas: 0, despesas_pagas: 0 })
+    }
+
+    const projection = computeProjectedBalance(overview.saldo_disponivel, overview.transactions, endDate)
 
     return {
         month: targetMonth,
         year: targetYear,
-        saldo_liquido: stats.receitas_recebidas - stats.despesas_pagas,
-        detalhes: stats
+        saldo_disponivel: overview.saldo_disponivel,
+        saldo_previsto_fim_do_mes: projection.saldo_previsto,
+        contas: overview.accounts.map(a => ({ nome: a.nome, saldo: a.saldo_atual })),
+        mes: {
+            receitas: fromCents(mes.receitas),
+            receitas_recebidas: fromCents(mes.receitas_recebidas),
+            despesas: fromCents(mes.despesas),
+            despesas_pagas: fromCents(mes.despesas_pagas),
+            resultado: fromCents(mes.receitas - mes.despesas)
+        }
     }
 }
 
