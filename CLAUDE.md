@@ -8,9 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev      # Dev server on localhost:3000 (runs `next dev --webpack`; Turbopack is intentionally not used, for Tailwind v4 stability)
 npm run build    # Production build (also the main type-check)
 npm run lint     # ESLint
+npm test         # Vitest (unit tests, single run); `npm run test:watch` for watch mode
+npx vitest run src/features/credit-cards  # run tests under one folder
 ```
 
-There is no test suite configured.
+Tests are Vitest (`vitest.config.ts`, node environment, `@/` alias, `TZ=America/Sao_Paulo`). They live next to the code as `*.test.ts` and cover the pure financial rules: `balances`, `invoices`, `reports`, `dashboard-alerts` and `lib/utils`. Pass `today`/dates explicitly to the pure functions instead of mocking the clock. When changing a balance, invoice or report rule, update or add the matching test.
 
 ## Architecture
 
@@ -38,7 +40,7 @@ Each feature groups `components/`, `hooks/`, `services/` (and sometimes `context
 - `credit-cards/`: `services/invoices.ts` computes faturas (pure functions: cycle, status, limit used) plus `fetchCardsOverview`, `payInvoice` and `reverseInvoicePayment`. Pages `/cartoes` and `/cartoes/[id]`.
 - `reports/`: `services/reports.ts` (`buildReport` is pure) feeds `/relatorios` and `api/insights`. `dashboard/services/dashboard-alerts.ts` builds the dashboard's upcoming payments and health alerts.
 - `ai-models/`: per-user LLM config (Configurações → IA, `?tab=ia`). `server/resolve-model.ts` → `resolveModel(userId, { usage: 'chat' | 'analise' } | { modelId })` returns the AI SDK model plus `providerOptions`; it reads the key through the service-role-only RPC `obter_modelo_ia`, falling back to `GROQ_API_KEY`/`OPENAI_API_KEY` when no model is configured. `describeAIError()` maps provider errors to user-facing messages. Every AI route must use `resolveModel`, never a hardcoded provider. The client service never reads keys (only `chave_final`).
-- `cofrinhos/` (savings goals), `subscriptions/` (`assinaturas`), `bank-accounts/`, `settings/` (categories, profile), `dashboard/` (sidebar, summary cards, charts), `auth/`.
+- `cofrinhos/` (savings goals; `services/projection.ts` projects balances at 100% of the CDI set in `perfis.configurar_cdi`, compound, no new deposits. Never hardcode a rate; `DEFAULT_CDI_ANUAL` is only the fallback), `subscriptions/` (`assinaturas`), `bank-accounts/`, `settings/` (categories, profile), `dashboard/` (sidebar, summary cards, charts), `auth/`.
 
 `src/app/(dashboard)/layout.tsx` is a client layout that mounts `TransactionProvider`, `SidebarProvider`, the AI chat window, and the calculator for all dashboard pages.
 
@@ -88,6 +90,8 @@ Migrations from 2026-11 onward live in `supabase/migrations/` and their filename
 
 ### Conventions
 - Path alias: `@/*` → `src/*`
+- Money display: always `formatCurrency()` from `@/lib/utils` (`{ fractionDigits: 0 }` for chart labels). Don't create local `Intl.NumberFormat`.
+- Errors: use `catch (e)` (no `any`) with `getErrorMessage(e)`, `toError(e)` and `getErrorCode(e)` from `@/lib/utils`. `no-explicit-any` is an error in lint and the codebase has none.
 - `src/components/ui/` contains shadcn primitives. Don't hand-edit them; add new ones with `npx shadcn@latest add <component>`.
 - UI accent colors use the `brand-1`, `brand-2`, `brand-3` theme tokens (CSS variables in `src/app/globals.css`).
 - Dates are stored as `YYYY-MM-DD` strings. Always use `parseLocalDate()` and `formatDateToISO()` from `@/lib/utils` instead of `new Date(str)` / `toISOString()` to avoid timezone off-by-one bugs.

@@ -2,7 +2,7 @@
 
 import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
 import * as React from "react"
-import { Plus, Landmark, Trash2, Edit, CreditCard, Wallet, Banknote, Star } from "lucide-react"
+import { Plus, Landmark, Trash2, Edit, Wallet, Banknote, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -14,13 +14,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -108,7 +102,7 @@ export function AccountsSettings() {
             setEditingAccount(null)
             setFormData(EMPTY_FORM)
             fetchAccounts()
-        } catch (error) {
+        } catch {
             toast.error(editingAccount ? "Erro ao atualizar conta" : "Erro ao criar conta", {
                 description: "Ocorreu um erro ao processar sua solicitação."
             })

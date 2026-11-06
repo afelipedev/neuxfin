@@ -11,6 +11,11 @@ import {
 } from '../services/cofrinhos'
 import { toast } from 'sonner'
 import { useTransactionContextOptional } from '@/features/transactions/context/transaction-context'
+import { getErrorMessage, toError, getErrorCode } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import { DEFAULT_CDI_ANUAL, fetchCdiRate } from '../services/projection'
+
+const cdiClient = createClient()
 
 export function useCofrinhos() {
     const [cofrinhos, setCofrinhos] = useState<Cofrinho[]>([])
@@ -23,8 +28,8 @@ export function useCofrinhos() {
             const data = await getCofrinhos()
             setCofrinhos(data)
             setError(null)
-        } catch (e: any) {
-            setError(e)
+        } catch (e) {
+            setError(toError(e))
             toast.error('Erro ao carregar cofrinhos')
         } finally {
             setLoading(false)
@@ -77,7 +82,7 @@ export function useCofrinhoActions() {
             await createCofrinho(cofrinho)
             toast.success('Cofrinho criado com sucesso!')
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error(e)
             toast.error('Erro ao criar cofrinho')
             return false
@@ -92,7 +97,7 @@ export function useCofrinhoActions() {
             await updateCofrinho(id, updates)
             toast.success('Cofrinho atualizado com sucesso!')
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error(e)
             toast.error('Erro ao atualizar cofrinho')
             return false
@@ -107,9 +112,9 @@ export function useCofrinhoActions() {
             await deleteCofrinho(id)
             toast.success('Cofrinho excluído com sucesso!')
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error(e)
-            toast.error(e?.code === '23503' && e?.message ? e.message : 'Erro ao excluir cofrinho')
+            toast.error(getErrorCode(e) === '23503' ? getErrorMessage(e, 'Erro ao excluir cofrinho') : 'Erro ao excluir cofrinho')
             return false
         } finally {
             setLoading(false)
@@ -124,9 +129,9 @@ export function useCofrinhoActions() {
             // Movimentos com conta alteram saldos bancários
             if (transaction.conta_id) notifyTransactions?.()
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error(e)
-            toast.error(e?.message ? `Erro: ${e.message}` : 'Erro ao realizar movimentação')
+            toast.error(`Erro: ${getErrorMessage(e, 'Erro ao realizar movimentação')}`)
             return false
         } finally {
             setLoading(false)
@@ -140,4 +145,21 @@ export function useCofrinhoActions() {
         addTransaction,
         loading
     }
+}
+
+/** CDI anual (%) configurado no perfil; usa o padrão enquanto carrega ou se falhar. */
+export function useCdiRate() {
+    const [cdi, setCdi] = useState(DEFAULT_CDI_ANUAL)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        let cancelled = false
+        fetchCdiRate(cdiClient)
+            .then(rate => { if (!cancelled) setCdi(rate) })
+            .catch(e => console.error('Erro ao carregar CDI do perfil', e))
+            .finally(() => { if (!cancelled) setLoading(false) })
+        return () => { cancelled = true }
+    }, [])
+
+    return { cdi, loading }
 }

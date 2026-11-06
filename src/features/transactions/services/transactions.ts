@@ -612,7 +612,7 @@ export async function getCashFlowData(year: number, numberOfMonths: number = 7, 
         monthlyData[key] = { receitas: 0, despesas: 0 }
     }
 
-    (transactions || []).forEach((t: any) => {
+    ((transactions ?? []) as Array<Pick<Transaction, 'valor' | 'tipo_transacao' | 'data_vencimento'>>).forEach((t) => {
         const date = parseLocalDate(t.data_vencimento)
         const key = `${date.getFullYear()}-${date.getMonth().toString().padStart(2, '0')}`
 

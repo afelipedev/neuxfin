@@ -16,7 +16,7 @@ export function useAuth() {
 
             toast.success('Logout realizado com sucesso!')
             router.push('/login')
-        } catch (error: any) {
+        } catch (error) {
             console.error('Erro ao fazer logout:', error)
             toast.error('Erro ao fazer logout. Tente novamente.')
         }

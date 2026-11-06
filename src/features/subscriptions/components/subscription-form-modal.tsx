@@ -31,7 +31,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
 import { useSubscriptionActions } from "../hooks/use-subscriptions"
 import { createClient } from "@/lib/supabase/client"
 import { Subscription } from "../services/subscriptions"
@@ -176,7 +175,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
             if (isEditing && subscription) {
                 success = await update(subscription.id, subscriptionData)
             } else {
-                success = await create(subscriptionData as any)
+                success = await create(subscriptionData)
             }
 
             if (success) {

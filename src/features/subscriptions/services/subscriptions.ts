@@ -92,7 +92,7 @@ export async function getSubscriptionStats(): Promise<SubscriptionStats> {
         totalCanceladas: 0
     };
 
-    (data || []).forEach((sub: any) => {
+    ((data ?? []) as Array<Pick<Subscription, 'valor' | 'status' | 'frequencia'>>).forEach((sub) => {
         // Calcular custo mensal baseado na frequência
         let valorMensal = Number(sub.valor)
 

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @source "../**/*.{ts,tsx}";
+/* Catálogo de skills vendorizado: fora da varredura de classes (evitava warning de CSS no build) */
+@source not "../../.agent";
 @custom-variant dark (&:is(.dark *));
 
 html {

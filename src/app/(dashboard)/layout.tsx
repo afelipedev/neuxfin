@@ -3,7 +3,7 @@
 import * as React from "react"
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { DashboardSidebar } from "@/features/dashboard/components/sidebar"
-import { Calculator, MessageSquare, Search, Bell, Sun, Moon } from "lucide-react"
+import { MessageSquare, Search, Bell, Sun, Moon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AIChatWindow } from "@/features/ai-chat/components/chat-window"
 import { IntelligentCalculator } from "@/features/calculator/components/calculator"

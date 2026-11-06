@@ -1,13 +1,25 @@
 "use client"
 
 import { useState } from "react"
-import { Wallet, TrendingUp, Plus, Edit, ArrowDownCircle, ArrowUpCircle, Percent, PiggyBank, ArrowUpRight, TrendingDown, Trash2 } from "lucide-react"
+import {
+    Wallet,
+    TrendingUp,
+    Plus,
+    Edit,
+    ArrowDownCircle,
+    ArrowUpCircle,
+    Percent,
+    PiggyBank,
+    ArrowUpRight,
+    Trash2,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useCofrinhos, useCofrinhoActions } from "@/features/cofrinhos/hooks/use-cofrinhos"
+import { useCofrinhos, useCofrinhoActions, useCdiRate } from "@/features/cofrinhos/hooks/use-cofrinhos"
+import { projectSavings } from "@/features/cofrinhos/services/projection"
+import Link from "next/link"
 import { CofrinhoModal } from "@/features/cofrinhos/components/cofrinho-modal"
 import { TransactionModal } from "@/features/cofrinhos/components/transaction-modal"
 import { Cofrinho } from "@/features/cofrinhos/services/cofrinhos"
@@ -21,10 +33,12 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { formatCurrency } from "@/lib/utils"
 
 export default function CofrinhosPage() {
     const { cofrinhos, loading, refresh } = useCofrinhos()
     const { remove } = useCofrinhoActions()
+    const { cdi, loading: loadingCdi } = useCdiRate()
 
     const [isCofrinhoModalOpen, setIsCofrinhoModalOpen] = useState(false)
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
@@ -61,6 +75,9 @@ export default function CofrinhosPage() {
     const totalPatrimonio = cofrinhos.reduce((acc, curr) => acc + Number(curr.saldo_atual), 0)
     const totalMetas = cofrinhos.reduce((acc, curr) => acc + (Number(curr.objetivo) || 0), 0)
     const percentualGeral = totalMetas > 0 ? (totalPatrimonio / totalMetas) * 100 : 0
+    // Previsão de 12 meses com o CDI configurado em Configurações → Perfil
+    const projecao = projectSavings(totalPatrimonio, cdi)
+    const cdiLabel = cdi.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
 
     return (
         <div className="space-y-8 max-w-[1600px] mx-auto pb-12">
@@ -91,7 +108,7 @@ export default function CofrinhosPage() {
                             <div className="space-y-1">
                                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Patrimônio em Reservas</p>
                                 <h3 className="text-3xl font-bold text-orange-600 tracking-tight">
-                                    {loading ? <Skeleton className="h-9 w-32" /> : `R$ ${totalPatrimonio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                    {loading ? <Skeleton className="h-9 w-32" /> : formatCurrency(totalPatrimonio)}
                                 </h3>
                                 <p className="text-[10px] text-muted-foreground">Total alocado em cofrinhos</p>
                             </div>
@@ -108,7 +125,7 @@ export default function CofrinhosPage() {
                             <div className="space-y-1">
                                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Objetivo Total</p>
                                 <h3 className="text-3xl font-bold text-emerald-500 tracking-tight">
-                                    {loading ? <Skeleton className="h-9 w-32" /> : `R$ ${totalMetas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                    {loading ? <Skeleton className="h-9 w-32" /> : formatCurrency(totalMetas)}
                                 </h3>
                                 <p className="text-[10px] text-emerald-500 font-bold">{percentualGeral.toFixed(1)}% do total concluído</p>
                             </div>
@@ -125,9 +142,13 @@ export default function CofrinhosPage() {
                             <div className="space-y-1">
                                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Previsão 12 Meses</p>
                                 <h3 className="text-3xl font-bold text-blue-500 tracking-tight">
-                                    {loading ? <Skeleton className="h-9 w-32" /> : `R$ ${(totalPatrimonio * 1.1315).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                    {loading || loadingCdi ? <Skeleton className="h-9 w-32" /> : formatCurrency(projecao.projetado)}
                                 </h3>
-                                <p className="text-[10px] text-muted-foreground">Baseado na taxa CDI atual</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                    {loading || loadingCdi
+                                        ? "Calculando com o seu CDI..."
+                                        : <>+{formatCurrency(projecao.rendimento)} a 100% do CDI de {cdiLabel}% a.a., sem novos aportes. <Link href="/configuracoes?tab=perfil" className="underline underline-offset-2">Alterar taxa</Link></>}
+                                </p>
                             </div>
                             <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
                                 <ArrowUpRight className="h-5 w-5 text-blue-500" />
@@ -205,7 +226,7 @@ export default function CofrinhosPage() {
                                         <div>
                                             <p className="text-[10px] uppercase text-muted-foreground font-black tracking-widest">Saldo Disponível</p>
                                             <p className="text-3xl font-black" style={{ color: cofrinho.cor }}>
-                                                R$ {saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                {formatCurrency(saldo)}
                                             </p>
                                         </div>
                                     </div>
@@ -216,7 +237,7 @@ export default function CofrinhosPage() {
                                         </div>
                                         <Progress value={progresso} className="h-1.5" style={{ backgroundColor: `${cofrinho.cor}1A` }} indicatorClassName="transition-all" indicatorStyle={{ backgroundColor: cofrinho.cor }} />
                                         <p className="text-[10px] text-muted-foreground text-right italic font-medium">
-                                            {objetivo > 0 ? `Meta: R$ ${objetivo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Sem meta definida'}
+                                            {objetivo > 0 ? `Meta: ${formatCurrency(objetivo)}` : 'Sem meta definida'}
                                         </p>
                                     </div>
                                 </CardContent>

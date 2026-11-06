@@ -2,9 +2,9 @@
 
 import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
 import * as React from "react"
-import { Plus, Tag, Trash2, Edit, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { Plus, Trash2, Edit, ArrowUpRight, ArrowDownRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import {
     Table,
     TableBody,
@@ -14,13 +14,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -94,7 +88,7 @@ export function CategoriesSettings() {
             setEditingCategory(null)
             setFormData({ nome: "", tipo: "despesa", cor: "#3b82f6" })
             fetchCategories()
-        } catch (error) {
+        } catch {
             toast.error(editingCategory ? "Erro ao atualizar categoria" : "Erro ao criar categoria", {
                 description: "Ocorreu um erro ao processar sua solicitação."
             })
@@ -112,7 +106,7 @@ export function CategoriesSettings() {
             })
             setDeletingId(null)
             fetchCategories()
-        } catch (error) {
+        } catch {
             toast.error("Erro ao excluir", {
                 description: "Não foi possível excluir a categoria."
             })

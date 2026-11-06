@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
+import { getErrorMessage, toError } from '@/lib/utils'
 import {
     getSubscriptions,
     getSubscriptionStats,
@@ -25,8 +26,8 @@ export function useSubscriptions() {
             const data = await getSubscriptions()
             setSubscriptions(data)
             setError(null)
-        } catch (e: any) {
-            setError(e)
+        } catch (e) {
+            setError(toError(e))
             toast.error('Erro ao carregar assinaturas')
         } finally {
             setLoading(false)
@@ -90,9 +91,9 @@ export function useSubscriptionActions() {
             await createSubscription(subscription)
             toast.success('Assinatura criada com sucesso!')
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error('Erro ao criar assinatura:', e)
-            toast.error(`Erro ao criar assinatura: ${e.message || 'Erro desconhecido'}`)
+            toast.error(`Erro ao criar assinatura: ${getErrorMessage(e)}`)
             return false
         } finally {
             setLoading(false)
@@ -108,7 +109,7 @@ export function useSubscriptionActions() {
             await updateSubscription(id, updates)
             toast.success('Assinatura atualizada com sucesso!')
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error('Erro ao atualizar assinatura:', e)
             toast.error('Erro ao atualizar assinatura')
             return false
@@ -123,7 +124,7 @@ export function useSubscriptionActions() {
             await deleteSubscription(id)
             toast.success('Assinatura excluída com sucesso!')
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error('Erro ao excluir assinatura:', e)
             toast.error('Erro ao excluir assinatura')
             return false
@@ -142,7 +143,7 @@ export function useSubscriptionActions() {
                 toast.info('Todas as despesas de assinaturas já foram geradas para este mês.')
             }
             return count
-        } catch (e: any) {
+        } catch (e) {
             console.error('Erro ao gerar despesas:', e)
             toast.error('Erro ao gerar despesas das assinaturas')
             return 0

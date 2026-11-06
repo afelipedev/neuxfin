@@ -3,12 +3,10 @@
 import * as React from "react"
 import Link from "next/link"
 import { ChatMarkdown } from "./chat-markdown"
-import { Send, MessageSquare, X, Sparkles, User, Bot } from "lucide-react"
+import { Send, X, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Badge } from "@/components/ui/badge"
 import { useChat } from '@ai-sdk/react'
 import { cn } from "@/lib/utils"
 
