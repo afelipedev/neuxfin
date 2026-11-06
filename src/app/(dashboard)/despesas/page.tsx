@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Filter, Download, Calendar, ArrowDownRight, AlertCircle, CheckCircle2, Clock, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import Link from "next/link"
+import { Filter, Calendar, ArrowDownRight, AlertCircle, CheckCircle2, Clock, ArrowUpDown, ArrowUp, ArrowDown, CreditCard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
@@ -27,6 +28,7 @@ import { ReplicateDialog } from "@/features/transactions/components/replicate-di
 import { EditTransactionDialog } from "@/features/transactions/components/edit-transaction-dialog"
 import { DeleteTransactionDialog } from "@/features/transactions/components/delete-transaction-dialog"
 import { SettleTransactionDialog } from "@/features/transactions/components/settle-transaction-dialog"
+import { ExportTransactionsButton } from "@/features/transactions/components/export-transactions-button"
 import { deriveStatus } from "@/features/bank-accounts/services/balances"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DataTablePagination } from "@/components/data-table-pagination"
@@ -279,9 +281,20 @@ export default function DespesasPage() {
                         </div>
                         <ReplicateDialog transactions={transactions} onSuccess={refresh} />
                     </div>
-                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground w-full sm:w-auto justify-center">
-                        <Download className="mr-2 h-4 w-4" /> Exportar Planilha
-                    </Button>
+                    <ExportTransactionsButton
+                        filters={{
+                            month: selectedMonth,
+                            year: selectedYear,
+                            tipo_transacao: 'despesa',
+                            tipo: tipoFilter === 'todos' ? undefined : tipoFilter,
+                            status: statusFilter === 'todos' ? undefined : statusFilter,
+                            categoria_id: categoriaFilter === 'todas' ? undefined : categoriaFilter,
+                            sortBy,
+                            sortOrder,
+                        }}
+                        fileName={`despesas_${selectedYear}_${String(selectedMonth).padStart(2, '0')}`}
+                        className="text-muted-foreground hover:text-foreground w-full sm:w-auto justify-center"
+                    />
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>
@@ -333,6 +346,15 @@ export default function DespesasPage() {
                                                     ({transaction.parcela_atual}/{transaction.total_parcelas})
                                                 </span>
                                             )}
+                                            {transaction.cartao_id && (
+                                                <Link
+                                                    href={`/cartoes/${transaction.cartao_id}`}
+                                                    className="ml-2 inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+                                                >
+                                                    <CreditCard className="h-3 w-3" />
+                                                    {transaction.cartao?.nome ?? 'Cartão'}
+                                                </Link>
+                                            )}
                                         </TableCell>
                                         <TableCell className="hidden md:table-cell">
                                             <Badge className={`${transaction.tipo === 'PJ'
@@ -354,7 +376,10 @@ export default function DespesasPage() {
                                         </TableCell>
                                         <TableCell className="text-right px-6">
                                             <div className="flex justify-end gap-1">
-                                                <SettleTransactionDialog transaction={transaction} onSuccess={refresh} />
+                                                {/* Compra no cartão é paga pela fatura, não individualmente */}
+                                                {!transaction.cartao_id && (
+                                                    <SettleTransactionDialog transaction={transaction} onSuccess={refresh} />
+                                                )}
                                                 <EditTransactionDialog transaction={transaction} onSuccess={refresh} />
                                                 <DeleteTransactionDialog transaction={transaction} onSuccess={refresh} />
                                             </div>

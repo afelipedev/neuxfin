@@ -76,6 +76,7 @@ export function EditTransactionDialog({ transaction, onSuccess, trigger }: EditT
 
     const isPaid = formData.status === 'liquidado'
     const isCardPurchase = !!transaction.cartao_id && formData.conta_id === NO_ACCOUNT
+    const paidByInvoice = !!transaction.fatura_pagamento_id
 
     const handleStatusChange = (status: Transaction['status']) => {
         setFormData(prev => ({
@@ -95,7 +96,8 @@ export function EditTransactionDialog({ transaction, onSuccess, trigger }: EditT
             tipo: formData.tipo,
             categoria_id: formData.categoria_id,
             data_vencimento: formData.data_vencimento,
-            ...buildStatusUpdate(formData.status, formData.data_pagamento || null, contaId),
+            // Paga pela fatura: status/conta são controlados pelo pagamento (estorne pela fatura)
+            ...(paidByInvoice ? {} : buildStatusUpdate(formData.status, formData.data_pagamento || null, contaId)),
         })
 
         if (success) {
@@ -192,6 +194,7 @@ export function EditTransactionDialog({ transaction, onSuccess, trigger }: EditT
                             <Select
                                 value={formData.conta_id}
                                 onValueChange={(value) => setFormData({ ...formData, conta_id: value })}
+                                disabled={paidByInvoice}
                             >
                                 <SelectTrigger id="conta_id">
                                     <SelectValue placeholder="Selecione" />
@@ -222,7 +225,7 @@ export function EditTransactionDialog({ transaction, onSuccess, trigger }: EditT
 
                         <div className="space-y-2">
                             <Label htmlFor="status">Status</Label>
-                            <Select value={formData.status} onValueChange={handleStatusChange}>
+                            <Select value={formData.status} onValueChange={handleStatusChange} disabled={paidByInvoice}>
                                 <SelectTrigger id="status">
                                     <SelectValue />
                                 </SelectTrigger>
@@ -249,6 +252,12 @@ export function EditTransactionDialog({ transaction, onSuccess, trigger }: EditT
                                 required
                             />
                         </div>
+                    )}
+
+                    {paidByInvoice && (
+                        <p className="text-xs text-muted-foreground">
+                            Compra paga pela fatura do cartão. Para reabrir, estorne o pagamento na página do cartão.
+                        </p>
                     )}
 
                     {isPaid && formData.conta_id === NO_ACCOUNT && !isCardPurchase && (

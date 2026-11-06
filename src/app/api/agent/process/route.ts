@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { openai } from '@ai-sdk/openai'
-import { generateText, tool } from 'ai'
-import { createClient } from '@supabase/supabase-js'
+import { generateText, stepCountIs, tool } from 'ai'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { describeAIError, resolveModel } from '@/features/ai-models/server/resolve-model'
 import {
     addTransactionCore,
     addTransactionSchema
@@ -26,6 +26,8 @@ function isAuthorized(req: Request): boolean {
     return timingSafeEqual(expected, received)
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function POST(req: Request) {
     if (!isAuthorized(req)) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -37,18 +39,20 @@ export async function POST(req: Request) {
     try {
         const { message, userId } = await req.json()
 
-        if (!userId) {
-            return new Response(JSON.stringify({ error: 'userId is required' }), { status: 400 })
+        if (typeof userId !== 'string' || !UUID_RE.test(userId)) {
+            return new Response(JSON.stringify({ error: 'userId (uuid) is required' }), { status: 400 })
+        }
+        if (typeof message !== 'string' || !message.trim()) {
+            return new Response(JSON.stringify({ error: 'message is required' }), { status: 400 })
         }
 
-        // Initialize Supabase Admin Client
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-        )
+        const supabase = createAdminClient()
+        // Usa o modelo de chat configurado pelo próprio usuário
+        const resolved = await resolveModel(userId, { usage: 'chat' })
 
-        const { text, toolCalls } = await generateText({
-            model: openai('gpt-4o-mini'),
+        const { text, steps } = await generateText({
+            model: resolved.model,
+            providerOptions: resolved.providerOptions,
             system: `Você é uma automação financeira que processa mensagens de texto ou transcrições de áudio do WhatsApp.
             
             OBJETIVO:
@@ -60,29 +64,40 @@ export async function POST(req: Request) {
             - Se a mensagem for clara sobre uma transação, chame a ferramenta 'add_transaction'.
             - Se a mensagem for vaga ou não for sobre finanças, responda explicando que não entendeu.
             - Tente inferir a categoria pelo contexto (ex: "McDonalds" -> Alimentação).
+            - Use pago=true quando o dinheiro já saiu/entrou ("gastei", "paguei", "recebi").
+            - Se o usuário citar a conta/banco (ex.: "no Nubank"), informe conta_nome.
+            - Hoje é ${new Date().toLocaleDateString('pt-BR')}. Datas no formato YYYY-MM-DD.
+            - Depois de registrar, confirme em uma frase curta (valor, descrição e conta).
             `,
             prompt: message,
             tools: {
                 add_transaction: tool({
                     description: 'Adiciona uma nova transação financeira baseada no relato do usuário.',
-                    parameters: addTransactionSchema,
-                    // @ts-ignore
-                    execute: async (params: any) => {
-                        return addTransactionCore(supabase, userId, params)
-                    },
+                    inputSchema: addTransactionSchema,
+                    execute: async (params) => addTransactionCore(supabase, userId, params),
                 }),
             },
+            // Permite que o modelo confirme o registro após a chamada da ferramenta
+            stopWhen: stepCountIs(3),
         })
+
+        // Com várias etapas, `toolCalls` traz só a última; junta as de todas as etapas
+        const toolCalls = steps.flatMap(step => step.toolCalls)
 
         return new Response(JSON.stringify({
             response: text,
-            toolCalls: toolCalls,
+            toolCalls,
             processed: toolCalls.length > 0
         }), {
             headers: { 'Content-Type': 'application/json' }
         })
 
-    } catch (error: any) {
-        return new Response(JSON.stringify({ error: error.message }), { status: 500 })
+    } catch (error: unknown) {
+        console.error('[agent/process]', error)
+        const { message, status } = describeAIError(error)
+        return new Response(JSON.stringify({ error: message }), {
+            status,
+            headers: { 'Content-Type': 'application/json' }
+        })
     }
 }

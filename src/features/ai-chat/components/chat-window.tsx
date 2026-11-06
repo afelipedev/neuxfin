@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
+import { ChatMarkdown } from "./chat-markdown"
 import { Send, MessageSquare, X, Sparkles, User, Bot } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,9 +13,29 @@ import { useChat } from '@ai-sdk/react'
 import { cn } from "@/lib/utils"
 
 export function AIChatWindow({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
-    const { messages, sendMessage, status } = useChat()
+    const { messages, sendMessage, status, error } = useChat()
+    // A rota responde {"error": "..."}; o transport repassa o corpo como mensagem
+    const errorMessage = React.useMemo(() => {
+        if (!error) return null
+        try {
+            return (JSON.parse(error.message) as { error?: string }).error ?? error.message
+        } catch {
+            return error.message || 'Não foi possível falar com o Amigão agora.'
+        }
+    }, [error])
     const [input, setInput] = React.useState('')
     const isLoading = status === 'submitted' || status === 'streaming'
+
+    // Texto do indicador: some quando a resposta começa a aparecer
+    const loadingLabel = React.useMemo(() => {
+        if (!isLoading) return null
+        const last = messages[messages.length - 1]
+        if (last?.role !== 'assistant') return 'Amigão está pensando...'
+        const hasText = last.parts.some(p => p.type === 'text' && p.text.trim().length > 0)
+        if (hasText) return null
+        const usingTool = last.parts.some(p => p.type.startsWith('tool-'))
+        return usingTool ? 'Consultando suas finanças...' : 'Amigão está pensando...'
+    }, [isLoading, messages])
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setInput(e.target.value)
@@ -70,32 +92,57 @@ export function AIChatWindow({ isOpen, onClose }: { isOpen: boolean, onClose: ()
                         <span className="text-[10px] font-black uppercase text-muted-foreground/50 px-1 tracking-widest">Neux AI</span>
                     </div>
 
-                    {messages.map((m: any) => (
+                    {messages.map((m) => {
+                        // Junta as partes de texto (entre chamadas de ferramenta vêm em várias partes)
+                        const text = m.parts
+                            .map(part => (part.type === 'text' ? part.text : ''))
+                            .filter(Boolean)
+                            .join('\n\n')
+                            .trim()
+                        // Enquanto o modelo só consulta ferramentas, não mostra balão vazio
+                        if (!text) return null
+                        const isUser = m.role === 'user'
+                        return (
                         <div key={m.id} className={cn(
                             "flex flex-col gap-2 max-w-[90%] animate-in fade-in slide-in-from-bottom-2 duration-300",
-                            m.role === 'user' ? "self-end items-end" : "self-start items-start"
+                            isUser ? "ml-auto items-end" : "mr-auto items-start"
                         )}>
                             <div className={cn(
-                                "p-4 rounded-2xl border shadow-sm text-sm font-medium leading-relaxed",
-                                m.role === 'user'
-                                    ? "bg-brand-1 text-zinc-950 rounded-br-none border-brand-1/50"
+                                "p-4 rounded-2xl border shadow-sm text-sm leading-relaxed",
+                                isUser
+                                    ? "bg-brand-1 text-zinc-950 font-medium rounded-br-none border-brand-1/50 whitespace-pre-wrap"
                                     : "bg-secondary/50 text-foreground rounded-tl-none border-border"
                             )}>
-                                {m.parts.map((part: any, i: number) => (
-                                    part.type === 'text' ? <React.Fragment key={i}>{part.text}</React.Fragment> : null
-                                ))}
+                                {isUser ? text : <ChatMarkdown text={text} />}
                             </div>
                             <span className="text-[10px] font-black uppercase text-muted-foreground/50 px-1 tracking-widest">
-                                {m.role === 'user' ? 'Você' : 'Neux AI'}
+                                {isUser ? 'Você' : 'Neux AI'}
                             </span>
                         </div>
-                    ))}
+                        )
+                    })}
 
-                    {isLoading && (
-                        <div className="flex flex-col gap-2 max-w-[90%] animate-in fade-in slide-in-from-left-2 duration-300">
-                            <div className="bg-secondary/50 p-4 rounded-2xl rounded-tl-none border border-border shadow-sm flex items-center gap-2">
-                                <span className="animate-pulse">Thinking...</span>
+                    {loadingLabel && (
+                        <div className="flex flex-col gap-2 max-w-[90%] animate-in fade-in slide-in-from-left-2 duration-300" role="status" aria-live="polite">
+                            <div className="bg-secondary/50 p-4 rounded-2xl rounded-tl-none border border-border shadow-sm flex items-center gap-2 text-sm text-muted-foreground">
+                                <span className="flex gap-1" aria-hidden="true">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-brand-1 animate-bounce [animation-delay:-0.3s]" />
+                                    <span className="h-1.5 w-1.5 rounded-full bg-brand-1 animate-bounce [animation-delay:-0.15s]" />
+                                    <span className="h-1.5 w-1.5 rounded-full bg-brand-1 animate-bounce" />
+                                </span>
+                                <span>{loadingLabel}</span>
                             </div>
+                        </div>
+                    )}
+
+                    {errorMessage && !isLoading && (
+                        <div role="alert" className="max-w-[90%] rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-600 dark:text-rose-400">
+                            {errorMessage}
+                            {errorMessage.includes('Configurações') && (
+                                <Link href="/configuracoes?tab=ia" onClick={onClose} className="mt-2 block font-semibold underline">
+                                    Abrir Configurações → IA
+                                </Link>
+                            )}
                         </div>
                     )}
 

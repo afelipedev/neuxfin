@@ -9,7 +9,8 @@ import { formatDateToISO } from '@/lib/utils'
  *   efetiva ≤ D. Movimentos considerados:
  *     · transações (receita +, despesa −), data efetiva = data_pagamento (ou vencimento);
  *     · transferências (destino +, origem −);
- *     · cofrinho com conta vinculada (resgate +, aporte −).
+ *     · cofrinho com conta vinculada (resgate +, aporte −);
+ *     · pagamento de fatura de cartão (−). As compras no cartão não têm conta e não entram.
  * - Se a conta tem data_saldo_inicial, movimentos anteriores a ela são ignorados
  *   (já estão refletidos no saldo inicial).
  * - Saldo Disponível = soma dos saldos de todas as contas em "hoje".
@@ -23,7 +24,7 @@ import { formatDateToISO } from '@/lib/utils'
 
 export type TxStatus = 'liquidado' | 'pendente' | 'atrasado'
 export type TxKind = 'receita' | 'despesa'
-export type MovementOrigin = 'transacao' | 'transferencia' | 'cofrinho'
+export type MovementOrigin = 'transacao' | 'transferencia' | 'cofrinho' | 'fatura'
 
 export interface BalanceTx {
     id?: string
@@ -60,12 +61,16 @@ export function effectiveDate(tx: Pick<BalanceTx, 'data_pagamento' | 'data_venci
     return isoDay(tx.data_pagamento || tx.data_vencimento)
 }
 
-/** Status considerando vencimento: pendente com vencimento passado é "atrasado". */
+/**
+ * Status considerando vencimento: pendente com vencimento passado é "atrasado".
+ * Compra no cartão (data_vencimento = data da compra) não atrasa por si: quem vence é a fatura.
+ */
 export function deriveStatus(
-    tx: Pick<BalanceTx, 'status' | 'data_vencimento'>,
+    tx: Pick<BalanceTx, 'status' | 'data_vencimento'> & { cartao_id?: string | null },
     today: string = todayISO()
 ): TxStatus {
     if (tx.status === 'liquidado') return 'liquidado'
+    if (tx.cartao_id) return 'pendente'
     return isoDay(tx.data_vencimento) < today ? 'atrasado' : 'pendente'
 }
 
@@ -292,6 +297,36 @@ export function cofrinhoToMovements(rows: CofrinhoMovRow[]): StatementTx[] {
     })
 }
 
+export interface InvoicePaymentRow {
+    id: string
+    conta_id: string
+    competencia: string
+    valor: number | string
+    data_pagamento: string
+    cartao: { nome: string } | null
+}
+
+/** Pagamento de fatura = saída da conta na data do pagamento. */
+export function invoicePaymentsToMovements(rows: InvoicePaymentRow[]): StatementTx[] {
+    return rows.map(p => {
+        const data = isoDay(p.data_pagamento)
+        const [ano, mes] = p.competencia.slice(0, 7).split('-')
+        return {
+            id: `fatura:${p.id}`,
+            ref_id: p.id,
+            origem: 'fatura' as const,
+            conta_id: p.conta_id,
+            tipo_transacao: 'despesa' as const,
+            valor: p.valor,
+            status: 'liquidado' as const,
+            data_vencimento: data,
+            data_pagamento: data,
+            descricao: `Pagamento da fatura ${p.cartao?.nome ?? 'do cartão'} (${mes}/${ano})`,
+            categoria: { nome: 'Cartão de crédito' }
+        }
+    })
+}
+
 // ---------- Acesso a dados (cliente injetado: browser ou server) ----------
 
 const PAGE_SIZE = 1000
@@ -318,11 +353,11 @@ function assertUuid(id: string) {
     if (!UUID_RE.test(id)) throw new Error('Identificador de conta inválido')
 }
 
-/** Transferências e movimentos de cofrinho que tocam contas (de uma conta, se informada). */
+/** Transferências, movimentos de cofrinho e pagamentos de fatura que tocam contas (de uma conta, se informada). */
 async function fetchNonTransactionMovements(supabase: SupabaseClient, contaId?: string): Promise<StatementTx[]> {
     if (contaId) assertUuid(contaId)
 
-    const [transfers, cofrinho] = await Promise.all([
+    const [transfers, cofrinho, faturas] = await Promise.all([
         fetchAll<TransferRow>((from, to) => {
             let query = supabase
                 .from('transferencias')
@@ -341,10 +376,24 @@ async function fetchNonTransactionMovements(supabase: SupabaseClient, contaId?: 
                 .range(from, to)
             if (contaId) query = query.eq('conta_id', contaId)
             return query
+        }),
+        fetchAll<InvoicePaymentRow>((from, to) => {
+            let query = supabase
+                .from('faturas_pagamentos')
+                .select('id, conta_id, competencia, valor, data_pagamento, cartao:cartoes_credito(nome)')
+                .is('estornado_em', null)
+                .order('id')
+                .range(from, to)
+            if (contaId) query = query.eq('conta_id', contaId)
+            return query
         })
     ])
 
-    return [...transfersToMovements(transfers, contaId), ...cofrinhoToMovements(cofrinho)]
+    return [
+        ...transfersToMovements(transfers, contaId),
+        ...cofrinhoToMovements(cofrinho),
+        ...invoicePaymentsToMovements(faturas)
+    ]
 }
 
 /** Todos os movimentos vinculados a contas (transações liquidadas/em aberto + transferências + cofrinho). */

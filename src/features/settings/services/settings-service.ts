@@ -21,6 +21,8 @@ export type BankAccount = {
     saldo_inicial: number
     /** Data de referência do saldo inicial (YYYY-MM-DD). Movimentos anteriores são ignorados. */
     data_saldo_inicial: string | null
+    /** Conta usada por automações (IA/WhatsApp) quando nenhuma é informada. */
+    padrao: boolean
     cor: string | null
     created_at: string
 }
@@ -90,7 +92,25 @@ export const settingsService = {
         return data as BankAccount[]
     },
 
-    async createBankAccount(account: Omit<BankAccount, 'id' | 'usuario_id' | 'created_at'>) {
+    /**
+     * Define a conta padrão (no máximo uma por usuário: índice único parcial).
+     * Desmarca a atual antes de marcar a nova; id nulo apenas remove a padrão.
+     */
+    async setDefaultBankAccount(id: string | null) {
+        const { error: unsetError } = await supabase
+            .from('contas_bancarias')
+            .update({ padrao: false })
+            .eq('padrao', true)
+        if (unsetError) throw unsetError
+        if (!id) return
+        const { error } = await supabase
+            .from('contas_bancarias')
+            .update({ padrao: true })
+            .eq('id', id)
+        if (error) throw error
+    },
+
+    async createBankAccount(account: Omit<BankAccount, 'id' | 'usuario_id' | 'created_at' | 'padrao'>) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error("Usuário não autenticado")
 
@@ -111,7 +131,7 @@ export const settingsService = {
         if (error) throw error
     },
 
-    async updateBankAccount(id: string, account: Partial<Omit<BankAccount, 'id' | 'usuario_id' | 'created_at'>>) {
+    async updateBankAccount(id: string, account: Partial<Omit<BankAccount, 'id' | 'usuario_id' | 'created_at' | 'padrao'>>) {
         const { data, error } = await supabase
             .from('contas_bancarias')
             .update(account)

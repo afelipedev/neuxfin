@@ -4,9 +4,11 @@ import * as React from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { CalendarIcon, Plus } from "lucide-react"
+import { CalendarIcon, CreditCard, Landmark, Plus } from "lucide-react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { toast } from "sonner"
+import type { FieldErrors } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -37,9 +39,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { cn, formatDateToISO } from "@/lib/utils"
+import { cn, formatDateToISO, parseLocalDate } from "@/lib/utils"
 import { useTransactionActions } from "../hooks/use-transactions"
 import { createClient } from "@/lib/supabase/client"
+import { type CardInfo, invoiceDates, invoiceKeyForDate } from "@/features/credit-cards/services/invoices"
 
 const formSchema = z.object({
     descricao: z.string().min(2, {
@@ -48,16 +51,39 @@ const formSchema = z.object({
     valor: z.string().min(1, "Valor é obrigatório"),
     tipo_perfil: z.enum(["PF", "PJ"]),
     categoria_id: z.string().min(1, "Categoria é obrigatória"),
-    conta_id: z.string().min(1, "Conta bancária é obrigatória"),
+    forma_pagamento: z.enum(["conta", "cartao"]),
+    // Opcionais: o campo da forma de pagamento não escolhida sai da tela e pode ficar undefined
+    conta_id: z.string().optional(),
+    cartao_id: z.string().optional(),
     recorrencia: z.string().optional(),
-    data: z.date(),
-    status: z.string(),
+    data: z.date({ error: "Selecione a data" }),
+    status: z.enum(["liquidado", "pendente"]),
     tipo_despesa: z.enum(["fixa", "variavel"]).optional(),
     is_parcelado: z.boolean(),
     total_parcelas: z.number().min(2).max(60).optional(),
+}).superRefine((values, ctx) => {
+    if (values.forma_pagamento === "conta" && !values.conta_id) {
+        ctx.addIssue({ code: "custom", path: ["conta_id"], message: "Conta bancária é obrigatória" })
+    }
+    if (values.forma_pagamento === "cartao" && !values.cartao_id) {
+        ctx.addIssue({ code: "custom", path: ["cartao_id"], message: "Selecione o cartão" })
+    }
 })
 
 type FormValues = z.infer<typeof formSchema>
+
+const FIELD_LABELS: Record<string, string> = {
+    descricao: "Descrição",
+    valor: "Valor",
+    tipo_perfil: "Perfil",
+    categoria_id: "Categoria",
+    forma_pagamento: "Forma de pagamento",
+    conta_id: "Conta bancária",
+    cartao_id: "Cartão",
+    data: "Data",
+    status: "Status",
+    total_parcelas: "Parcelas",
+}
 
 interface Category {
     id: string
@@ -70,54 +96,94 @@ interface BankAccount {
     nome: string
     instituicao: string | null
     tipo: string
+    padrao: boolean
 }
 
-export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" | "despesa", onSuccess?: () => void, trigger?: React.ReactNode }) {
-    const [open, setOpen] = React.useState(false)
+interface TransactionFormProps {
+    type: "receita" | "despesa"
+    onSuccess?: () => void
+    trigger?: React.ReactNode
+    /** Abertura controlada (ex.: menu "Nova transação"). Sem `trigger`, nenhum botão é renderizado. */
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
+}
+
+const emptyValues = (type: "receita" | "despesa"): FormValues => ({
+    descricao: "",
+    valor: "",
+    tipo_perfil: "PF",
+    categoria_id: "",
+    forma_pagamento: "conta",
+    conta_id: "",
+    cartao_id: "",
+    status: type === "receita" ? "liquidado" : "pendente",
+    data: new Date(),
+    is_parcelado: false,
+    total_parcelas: 2,
+})
+
+export function TransactionForm({ type, onSuccess, trigger, open: openProp, onOpenChange }: TransactionFormProps) {
+    const [internalOpen, setInternalOpen] = React.useState(false)
+    const isControlled = openProp !== undefined
+    const open = isControlled ? openProp : internalOpen
+    const setOpen = React.useCallback((next: boolean) => {
+        if (!isControlled) setInternalOpen(next)
+        onOpenChange?.(next)
+    }, [isControlled, onOpenChange])
+
     const [categories, setCategories] = React.useState<Category[]>([])
     const [bankAccounts, setBankAccounts] = React.useState<BankAccount[]>([])
+    const [cards, setCards] = React.useState<CardInfo[]>([])
     const { create, loading } = useTransactionActions()
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
-        defaultValues: {
-            descricao: "",
-            valor: "",
-            tipo_perfil: "PF",
-            status: type === "receita" ? "liquidado" : "pendente",
-            data: new Date(),
-            is_parcelado: false,
-            total_parcelas: 2,
-            conta_id: "",
-        },
+        defaultValues: emptyValues(type),
     })
 
     const isParcelado = form.watch("is_parcelado")
+    const formaPagamento = form.watch("forma_pagamento")
+    const cartaoId = form.watch("cartao_id")
+    const dataCompra = form.watch("data")
+    const isCartao = type === "despesa" && formaPagamento === "cartao"
+
+    const selectedCard = cards.find(c => c.id === cartaoId)
+    const faturaInfo = isCartao && selectedCard && dataCompra
+        ? (() => {
+            const key = invoiceKeyForDate(formatDateToISO(dataCompra), selectedCard)
+            const { vencimento } = invoiceDates(key, selectedCard)
+            return { key, vencimento }
+        })()
+        : null
 
     React.useEffect(() => {
         const loadData = async () => {
             const supabase = createClient()
 
-            // Carregar categorias
-            const { data: categoriesData } = await supabase
-                .from('categorias')
-                .select('id, nome, tipo')
-                .or(`tipo.eq.${type},tipo.is.null`)
+            const [{ data: categoriesData }, { data: accountsData }, { data: cardsData }] = await Promise.all([
+                supabase.from('categorias').select('id, nome, tipo').or(`tipo.eq.${type},tipo.is.null`),
+                supabase.from('contas_bancarias').select('id, nome, instituicao, tipo, padrao').order('nome'),
+                type === 'despesa'
+                    ? supabase.from('cartoes_credito').select('id, nome, limite, dia_fechamento, dia_vencimento').order('nome')
+                    : Promise.resolve({ data: [] as CardInfo[] }),
+            ])
 
             if (categoriesData) setCategories(categoriesData)
-
-            // Carregar contas bancárias
-            const { data: accountsData } = await supabase
-                .from('contas_bancarias')
-                .select('id, nome, instituicao, tipo')
-                .order('nome')
-
-            if (accountsData) setBankAccounts(accountsData)
+            if (accountsData) {
+                setBankAccounts(accountsData)
+                // Pré-seleciona a conta padrão (ou a única conta)
+                const padrao = accountsData.find(a => a.padrao) ?? (accountsData.length === 1 ? accountsData[0] : undefined)
+                if (padrao && !form.getValues("conta_id")) form.setValue("conta_id", padrao.id)
+            }
+            if (cardsData) setCards(cardsData as CardInfo[])
         }
         if (open) loadData()
-    }, [open, type])
+    }, [open, type, form])
 
     async function onSubmit(values: FormValues) {
+        const viaCartao = type === "despesa" && values.forma_pagamento === "cartao"
+        // Compra no cartão fica em aberto até o pagamento da fatura
+        const status = viaCartao ? "pendente" : values.status
         try {
             const success = await create({
                 descricao: values.descricao,
@@ -125,10 +191,11 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
                 tipo: values.tipo_perfil,
                 tipo_transacao: type,
                 categoria_id: values.categoria_id,
-                conta_id: values.conta_id,
+                conta_id: viaCartao ? null : values.conta_id,
+                cartao_id: viaCartao ? values.cartao_id : null,
                 data_vencimento: formatDateToISO(values.data),
-                data_pagamento: values.status === 'liquidado' ? formatDateToISO(values.data) : null,
-                status: values.status as any,
+                data_pagamento: status === 'liquidado' ? formatDateToISO(values.data) : null,
+                status,
                 is_recorrente: !!values.recorrencia,
                 parcela_atual: null,
                 total_parcelas: null,
@@ -136,7 +203,7 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
 
             if (success) {
                 setOpen(false)
-                form.reset()
+                form.reset(emptyValues(type))
                 onSuccess?.()
             }
         } catch (error) {
@@ -144,18 +211,31 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
         }
     }
 
+    // Avisa quando a validação bloqueia o envio (inclui campos que não estão visíveis)
+    function onInvalid(errors: FieldErrors<FormValues>) {
+        const [field, first] = Object.entries(errors)[0] ?? []
+        console.warn("[transaction-form] validação", errors)
+        const message = typeof first?.message === "string" ? first.message : "Revise os campos do formulário"
+        toast.error(field ? `${FIELD_LABELS[field] ?? field}: ${message}` : message)
+    }
+
+    const [dateOpen, setDateOpen] = React.useState(false)
+    const showTrigger = !isControlled || trigger
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                {trigger || (
-                    <Button className={cn(
-                        "text-white",
-                        type === "receita" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
-                    )}>
-                        <Plus className="mr-2 h-4 w-4" /> Nova {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </Button>
-                )}
-            </DialogTrigger>
+            {showTrigger && (
+                <DialogTrigger asChild>
+                    {trigger || (
+                        <Button className={cn(
+                            "text-white",
+                            type === "receita" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
+                        )}>
+                            <Plus className="mr-2 h-4 w-4" /> Nova {type.charAt(0).toUpperCase() + type.slice(1)}
+                        </Button>
+                    )}
+                </DialogTrigger>
+            )}
             <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Cadastrar {type}</DialogTitle>
@@ -164,7 +244,7 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
                         <FormField
                             control={form.control}
                             name="descricao"
@@ -219,30 +299,91 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
                             />
                         </div>
 
-                        <FormField
-                            control={form.control}
-                            name="conta_id"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Conta Bancária</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Selecione a conta" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {bankAccounts.map((account) => (
-                                                <SelectItem key={account.id} value={account.id}>
-                                                    {account.nome} {account.instituicao && `- ${account.instituicao}`}
-                                                </SelectItem>
+                        {type === "despesa" && cards.length > 0 && (
+                            <FormField
+                                control={form.control}
+                                name="forma_pagamento"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Forma de pagamento</FormLabel>
+                                        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Forma de pagamento">
+                                            {([
+                                                { value: "conta", label: "Conta / Pix / Débito", icon: Landmark },
+                                                { value: "cartao", label: "Cartão de crédito", icon: CreditCard },
+                                            ] as const).map(opt => (
+                                                <Button
+                                                    key={opt.value}
+                                                    type="button"
+                                                    role="radio"
+                                                    aria-checked={field.value === opt.value}
+                                                    variant={field.value === opt.value ? "default" : "outline"}
+                                                    className="justify-start gap-2"
+                                                    onClick={() => field.onChange(opt.value)}
+                                                >
+                                                    <opt.icon className="h-4 w-4" />
+                                                    {opt.label}
+                                                </Button>
                                             ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                                        </div>
+                                    </FormItem>
+                                )}
+                            />
+                        )}
+
+                        {isCartao ? (
+                            <FormField
+                                control={form.control}
+                                name="cartao_id"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Cartão</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Selecione o cartão" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {cards.map((card) => (
+                                                    <SelectItem key={card.id} value={card.id}>{card.nome}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {faturaInfo && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Entra na fatura de {format(parseLocalDate(`${faturaInfo.key}-01`), "MMMM 'de' yyyy", { locale: ptBR })}, com vencimento em {format(parseLocalDate(faturaInfo.vencimento), "dd/MM/yyyy")}.
+                                            </p>
+                                        )}
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        ) : (
+                            <FormField
+                                control={form.control}
+                                name="conta_id"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Conta Bancária</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Selecione a conta" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {bankAccounts.map((account) => (
+                                                    <SelectItem key={account.id} value={account.id}>
+                                                        {account.nome} {account.instituicao && `- ${account.instituicao}`}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
@@ -266,13 +407,13 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
                                     </FormItem>
                                 )}
                             />
-                            <FormField
+                            {!isCartao && <FormField
                                 control={form.control}
                                 name="status"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Status</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Selecione" />
@@ -286,7 +427,7 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
                                         <FormMessage />
                                     </FormItem>
                                 )}
-                            />
+                            />}
                         </div>
 
                         <FormField
@@ -294,11 +435,12 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
                             name="data"
                             render={({ field }) => (
                                 <FormItem className="flex flex-col">
-                                    <FormLabel>Data</FormLabel>
-                                    <Popover>
+                                    <FormLabel>{isCartao ? "Data da compra" : "Data"}</FormLabel>
+                                    <Popover open={dateOpen} onOpenChange={setDateOpen}>
                                         <PopoverTrigger asChild>
                                             <FormControl>
                                                 <Button
+                                                    type="button"
                                                     variant={"outline"}
                                                     className={cn(
                                                         "w-full pl-3 text-left font-normal",
@@ -317,8 +459,13 @@ export function TransactionForm({ type, onSuccess, trigger }: { type: "receita" 
                                         <PopoverContent className="w-auto p-0" align="start">
                                             <Calendar
                                                 mode="single"
+                                                required
                                                 selected={field.value}
-                                                onSelect={field.onChange}
+                                                onSelect={(date) => {
+                                                    // Clicar no dia já selecionado não deve apagar a data
+                                                    if (date) field.onChange(date)
+                                                    setDateOpen(false)
+                                                }}
                                                 disabled={(date) =>
                                                     date < new Date("1900-01-01")
                                                 }

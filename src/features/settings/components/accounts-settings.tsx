@@ -2,7 +2,7 @@
 
 import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
 import * as React from "react"
-import { Plus, Landmark, Trash2, Edit, CreditCard, Wallet, Banknote } from "lucide-react"
+import { Plus, Landmark, Trash2, Edit, CreditCard, Wallet, Banknote, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -117,6 +117,19 @@ export function AccountsSettings() {
         }
     }
 
+    const handleToggleDefault = async (account: BankAccount) => {
+        try {
+            await settingsService.setDefaultBankAccount(account.padrao ? null : account.id)
+            toast.success(account.padrao ? "Conta padrão removida" : `${account.nome} agora é a conta padrão`, {
+                description: account.padrao ? undefined : "Usada pela IA e pelo WhatsApp quando nenhuma conta é informada."
+            })
+            fetchAccounts()
+        } catch (error) {
+            console.error(error)
+            toast.error("Não foi possível alterar a conta padrão")
+        }
+    }
+
     const handleDelete = async () => {
         if (!deletingId) return
         try {
@@ -133,7 +146,7 @@ export function AccountsSettings() {
             const code = (error as { code?: string })?.code
             toast.error("Não foi possível excluir a conta", {
                 description: code === '23503'
-                    ? (message?.includes('lançamento') ? message : "A conta possui transferências ou movimentos de cofrinho vinculados.")
+                    ? (message?.includes('lançamento') ? message : "A conta possui transferências, movimentos de cofrinho ou pagamentos de fatura vinculados.")
                     : "Ocorreu um erro ao processar sua solicitação."
             })
             setDeletingId(null)
@@ -311,7 +324,12 @@ export function AccountsSettings() {
                                                     {getIcon(account.tipo)}
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold">{account.nome}</div>
+                                                    <div className="font-bold flex items-center gap-2">
+                                                        {account.nome}
+                                                        {account.padrao && (
+                                                            <Badge className="bg-brand-1/10 text-brand-1 border-none text-[9px] h-4 px-1.5 uppercase">Padrão</Badge>
+                                                        )}
+                                                    </div>
                                                     <div className="text-[10px] text-muted-foreground uppercase">{account.instituicao || "Geral"}</div>
                                                 </div>
                                             </div>
@@ -331,6 +349,17 @@ export function AccountsSettings() {
                                         </TableCell>
                                         <TableCell className="text-right px-6">
                                             <div className="flex justify-end gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className={account.padrao ? "h-7 w-7 text-amber-500" : "h-7 w-7 text-muted-foreground"}
+                                                    onClick={() => handleToggleDefault(account)}
+                                                    aria-label={account.padrao ? "Remover como conta padrão" : "Definir como conta padrão"}
+                                                    aria-pressed={account.padrao}
+                                                    title={account.padrao ? "Conta padrão (usada pela IA e pelo WhatsApp)" : "Definir como conta padrão"}
+                                                >
+                                                    <Star className="h-3.5 w-3.5" fill={account.padrao ? "currentColor" : "none"} />
+                                                </Button>
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
