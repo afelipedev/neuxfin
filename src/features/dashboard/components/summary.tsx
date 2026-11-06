@@ -1,9 +1,13 @@
-import { ArrowUpRight, ArrowDownRight, TrendingUp, AlertTriangle, Wallet, ArrowUp, ArrowDown, Plus } from "lucide-react"
+import Link from "next/link"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { ArrowUpRight, ArrowDownRight, AlertTriangle, Wallet, ArrowUp, ArrowDown, Plus, CheckCircle2, CreditCard } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { cn, formatCurrency } from "@/lib/utils"
+import { cn, formatCurrency, parseLocalDate } from "@/lib/utils"
 import type { DashboardStats } from "@/features/transactions/services/transactions"
+import { todayISO } from "@/features/bank-accounts/services/balances"
+import type { AlertLevel, HealthAlert, UpcomingItem } from "../services/dashboard-alerts"
 
 interface StatsProps {
     stats: DashboardStats
@@ -128,6 +132,12 @@ export function QuickBalanceDetail({ stats }: StatsProps) {
                         <span className="text-muted-foreground/60 min-w-0">− A pagar (inclui atrasadas):</span>
                         <span className="text-amber-500 font-bold font-body tabular-nums">{formatCurrency(stats.despesas_a_pagar)}</span>
                     </div>
+                    {stats.faturas_a_pagar > 0 && (
+                        <div className="flex justify-between gap-3 text-[11px] font-semibold">
+                            <span className="text-muted-foreground/60 min-w-0">− Faturas de cartão:</span>
+                            <span className="text-amber-500 font-bold font-body tabular-nums">{formatCurrency(stats.faturas_a_pagar)}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between gap-3 pt-2 text-xs font-black border-t border-border">
                         <span className="uppercase tracking-widest text-[10px] text-foreground/50">= Saldo previsto:</span>
                         <span className={cn("tabular-nums", stats.saldo_previsto >= 0 ? "text-brand-1" : "text-rose-500")}>
@@ -169,44 +179,129 @@ export function QuickBalanceDetail({ stats }: StatsProps) {
 }
 
 
-export function UpcomingPayments() {
+const UPCOMING_LIMIT = 6
+
+export function UpcomingPayments({ items, loading }: { items: UpcomingItem[]; loading?: boolean }) {
+    const visible = items.slice(0, UPCOMING_LIMIT)
+    const today = todayISO()
+
     return (
         <Card className="border-none glass-card transition-all duration-300">
             <CardHeader className="p-6 pb-2">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Próximos Vencimentos</CardTitle>
-                    <button className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">...</button>
+                    <span className="text-[10px] text-muted-foreground/60 font-semibold">7 dias + atrasados</span>
                 </div>
             </CardHeader>
-            <CardContent className="p-6 pt-0 min-h-[120px] flex flex-col items-center justify-center opacity-40">
-                <div className="h-8 w-8 rounded-full bg-secondary dark:bg-zinc-100/10 flex items-center justify-center mb-2">
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="text-[10px] text-muted-foreground font-medium italic text-center uppercase tracking-tighter">Sem contas pendentes</p>
+            <CardContent className="p-6 pt-2">
+                {loading ? (
+                    <div className="space-y-2">
+                        {[1, 2, 3].map(i => <div key={i} className="h-10 rounded-xl bg-secondary/50 animate-pulse" />)}
+                    </div>
+                ) : visible.length === 0 ? (
+                    <div className="min-h-[100px] flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                        <CheckCircle2 className="h-5 w-5 text-brand-1" />
+                        <p className="text-[11px] font-semibold">Nada vencendo nos próximos 7 dias</p>
+                    </div>
+                ) : (
+                    <ul className="space-y-1">
+                        {visible.map(item => {
+                            const Icon = item.kind === 'fatura' ? CreditCard : item.kind === 'receita' ? ArrowUp : ArrowDown
+                            const quando = item.atrasado
+                                ? 'Atrasado'
+                                : item.vencimento === today
+                                    ? 'Vence hoje'
+                                    : format(parseLocalDate(item.vencimento), "dd 'de' MMM", { locale: ptBR })
+                            return (
+                                <li key={item.id}>
+                                    <Link
+                                        href={item.href}
+                                        className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-secondary/60 transition-colors"
+                                    >
+                                        <span className={cn(
+                                            "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center",
+                                            item.kind === 'receita' ? "bg-brand-2/10 text-brand-2" : "bg-rose-500/10 text-rose-500"
+                                        )}>
+                                            <Icon className="h-4 w-4" />
+                                        </span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block truncate text-[12px] font-bold text-foreground">{item.descricao}</span>
+                                            <span className={cn(
+                                                "block text-[10px] font-semibold",
+                                                item.atrasado ? "text-rose-500" : "text-muted-foreground"
+                                            )}>{quando}</span>
+                                        </span>
+                                        <span className={cn(
+                                            "text-[12px] font-black tabular-nums shrink-0",
+                                            item.kind === 'receita' ? "text-brand-2" : "text-foreground"
+                                        )}>
+                                            {formatCurrency(item.valor)}
+                                        </span>
+                                    </Link>
+                                </li>
+                            )
+                        })}
+                        {items.length > UPCOMING_LIMIT && (
+                            <li className="pt-1 text-center text-[10px] text-muted-foreground font-semibold">
+                                + {items.length - UPCOMING_LIMIT} outro(s)
+                            </li>
+                        )}
+                    </ul>
+                )}
             </CardContent>
         </Card>
     )
 }
 
-export function AlertCard() {
+const ALERT_STYLE: Record<AlertLevel, { box: string; text: string; Icon: typeof AlertTriangle }> = {
+    critico: { box: "bg-rose-500/5 border-rose-500/15", text: "text-rose-600 dark:text-rose-400", Icon: AlertTriangle },
+    atencao: { box: "bg-amber-500/5 border-amber-500/15", text: "text-amber-600 dark:text-amber-400", Icon: AlertTriangle },
+    ok: { box: "bg-brand-1/5 border-brand-1/15", text: "text-brand-1", Icon: CheckCircle2 },
+}
+
+export function AlertCard({ alerts, loading }: { alerts: HealthAlert[]; loading?: boolean }) {
+    const criticos = alerts.filter(a => a.level === 'critico').length
+
     return (
-        <Card className="border-none glass-card group cursor-pointer active:scale-[0.98] transition-all duration-300">
+        <Card className="border-none glass-card transition-all duration-300">
             <CardHeader className="p-6 pb-2">
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Alertas de Saúde</CardTitle>
-                    <span className="bg-rose-500 text-white text-[10px] h-5 px-2 rounded-full font-black flex items-center">0 Críticos</span>
+                    {criticos > 0 && (
+                        <span className="bg-rose-500 text-white text-[10px] h-5 px-2 rounded-full font-black flex items-center">
+                            {criticos} {criticos === 1 ? 'Crítico' : 'Críticos'}
+                        </span>
+                    )}
                 </div>
             </CardHeader>
-            <CardContent className="p-6 pt-2">
-                <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 space-y-2 group-hover:bg-amber-500/10 transition-all duration-300">
-                    <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-amber-500" />
-                        <h5 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Reserva Insuficiente</h5>
+            <CardContent className="p-6 pt-2 space-y-2">
+                {loading ? (
+                    <div className="h-16 rounded-2xl bg-secondary/50 animate-pulse" />
+                ) : alerts.length === 0 ? (
+                    <div className="flex items-center gap-2 p-4 rounded-2xl bg-brand-1/5 border border-brand-1/15 text-brand-1">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        <p className="text-[11px] font-semibold">Nenhum alerta no momento.</p>
                     </div>
-                    <p className="text-[11px] text-amber-500/80 leading-relaxed font-semibold">
-                        Sua reserva atual cobre 1.1 meses. Meta recomendada: 6 meses.
-                    </p>
-                </div>
+                ) : alerts.map(alert => {
+                    const style = ALERT_STYLE[alert.level]
+                    const content = (
+                        <>
+                            <div className="flex items-center gap-2">
+                                <style.Icon className={cn("h-4 w-4 shrink-0", style.text)} />
+                                <h5 className={cn("text-[10px] font-black uppercase tracking-widest", style.text)}>{alert.titulo}</h5>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed font-semibold">{alert.descricao}</p>
+                        </>
+                    )
+                    const className = cn("block p-4 rounded-2xl border space-y-1.5 transition-colors", style.box)
+                    return alert.href ? (
+                        <Link key={alert.id} href={alert.href} className={cn(className, "hover:brightness-95 dark:hover:brightness-125")}>
+                            {content}
+                        </Link>
+                    ) : (
+                        <div key={alert.id} className={className}>{content}</div>
+                    )
+                })}
             </CardContent>
         </Card>
     )

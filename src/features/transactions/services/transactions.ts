@@ -10,6 +10,7 @@ import {
     toCents,
     todayISO
 } from '@/features/bank-accounts/services/balances'
+import { fetchCardsOverview, openInvoicesUntil } from '@/features/credit-cards/services/invoices'
 
 export interface Transaction {
     id: string
@@ -28,6 +29,9 @@ export interface Transaction {
     }
     conta_id?: string | null
     cartao_id?: string | null
+    conta?: { nome: string } | null
+    cartao?: { nome: string } | null
+    fatura_pagamento_id?: string | null
     data_vencimento: string
     data_pagamento: string | null
     status: 'liquidado' | 'pendente' | 'atrasado'
@@ -87,7 +91,9 @@ export async function getTransactions(filters: TransactionFilters = {}) {
         .from('transacoes')
         .select(`
             *,
-            categoria:categorias(*)
+            categoria:categorias(*),
+            conta:contas_bancarias(nome),
+            cartao:cartoes_credito(nome)
         `, { count: 'exact' })
         .gte('data_vencimento', startDate)
         .lte('data_vencimento', endDate)
@@ -101,13 +107,14 @@ export async function getTransactions(filters: TransactionFilters = {}) {
         query = query.eq('tipo_transacao', tipo_transacao)
     }
 
-    // "atrasado" é derivado: em aberto com vencimento anterior a hoje
+    // "atrasado" é derivado: em aberto com vencimento anterior a hoje.
+    // Compra no cartão nunca atrasa por si (quem vence é a fatura) — ver deriveStatus.
     if (status === 'liquidado') {
         query = query.eq('status', 'liquidado')
     } else if (status === 'pendente') {
-        query = query.neq('status', 'liquidado').gte('data_vencimento', todayISO())
+        query = query.neq('status', 'liquidado').or(`data_vencimento.gte.${todayISO()},cartao_id.not.is.null`)
     } else if (status === 'atrasado') {
-        query = query.neq('status', 'liquidado').lt('data_vencimento', todayISO())
+        query = query.neq('status', 'liquidado').lt('data_vencimento', todayISO()).is('cartao_id', null)
     }
 
     if (categoria_id) {
@@ -126,6 +133,20 @@ export async function getTransactions(filters: TransactionFilters = {}) {
     return {
         data: data as Transaction[],
         count: count || 0
+    }
+}
+
+/**
+ * Todas as transações que atendem aos filtros (sem paginação de tela), para exportação.
+ * Pagina de 1000 em 1000 por causa do limite do PostgREST.
+ */
+export async function getAllTransactions(filters: Omit<TransactionFilters, 'page' | 'pageSize'> = {}) {
+    const pageSize = 1000
+    const all: Transaction[] = []
+    for (let page = 1; ; page++) {
+        const { data } = await getTransactions({ ...filters, page, pageSize })
+        all.push(...data)
+        if (data.length < pageSize) return all
     }
 }
 
@@ -432,6 +453,8 @@ export interface DashboardStats {
     saldo_previsto: number
     receitas_a_receber: number
     despesas_a_pagar: number
+    /** Faturas de cartão em aberto com vencimento até o fim do mês (inclui vencidas) */
+    faturas_a_pagar: number
     transacoes_pagas_sem_conta: number
 }
 
@@ -447,6 +470,7 @@ export const EMPTY_DASHBOARD_STATS: DashboardStats = {
     saldo_previsto: 0,
     receitas_a_receber: 0,
     despesas_a_pagar: 0,
+    faturas_a_pagar: 0,
     transacoes_pagas_sem_conta: 0
 }
 
@@ -454,7 +478,8 @@ export const EMPTY_DASHBOARD_STATS: DashboardStats = {
  * Busca estatísticas do dashboard.
  * - Totais do mês por data_vencimento (competência).
  * - saldo_atual = Saldo Disponível hoje (soma das contas), igual em qualquer mês navegado.
- * - saldo_previsto = saldo_atual + lançamentos em aberto (com conta) até o fim do mês selecionado.
+ * - saldo_previsto = saldo_atual + lançamentos em aberto (com conta) − faturas de cartão em aberto,
+ *   com vencimento até o fim do mês selecionado.
  * Regras de saldo centralizadas em features/bank-accounts/services/balances.ts.
  */
 export async function getDashboardStats(filters: { month?: number, year?: number } = {}): Promise<DashboardStats> {
@@ -464,16 +489,17 @@ export async function getDashboardStats(filters: { month?: number, year?: number
     const endDate = formatDateToISO(new Date(year, month, 0))
     const today = todayISO()
 
-    type DashboardTxRow = Pick<BalanceTx, 'valor' | 'tipo_transacao' | 'status' | 'data_vencimento'>
+    type DashboardTxRow = Pick<BalanceTx, 'valor' | 'tipo_transacao' | 'status' | 'data_vencimento'> & { cartao_id: string | null }
 
-    const [monthResult, overview, semConta] = await Promise.all([
+    const [monthResult, overview, semConta, cards] = await Promise.all([
         supabase
             .from('transacoes')
-            .select('valor, tipo_transacao, status, data_vencimento')
+            .select('valor, tipo_transacao, status, data_vencimento, cartao_id')
             .gte('data_vencimento', startDate)
             .lte('data_vencimento', endDate),
         fetchBalanceOverview(supabase),
-        countLiquidatedWithoutAccount(supabase)
+        countLiquidatedWithoutAccount(supabase),
+        fetchCardsOverview(supabase, today)
     ])
 
     if (monthResult.error) throw monthResult.error
@@ -500,6 +526,7 @@ export async function getDashboardStats(filters: { month?: number, year?: number
     }
 
     const projection = computeProjectedBalance(overview.saldo_disponivel, overview.transactions, endDate)
+    const faturas = openInvoicesUntil(cards.invoices, endDate)
 
     return {
         total_receitas: fromCents(c.receitas),
@@ -510,9 +537,10 @@ export async function getDashboardStats(filters: { month?: number, year?: number
         total_despesas_atrasadas: fromCents(c.atrasadas),
         resultado_mes: fromCents(c.receitas - c.despesas),
         saldo_atual: overview.saldo_disponivel,
-        saldo_previsto: projection.saldo_previsto,
+        saldo_previsto: fromCents(toCents(projection.saldo_previsto) - toCents(faturas)),
         receitas_a_receber: projection.receitas_a_receber,
         despesas_a_pagar: projection.despesas_a_pagar,
+        faturas_a_pagar: faturas,
         transacoes_pagas_sem_conta: semConta
     }
 }

@@ -6,32 +6,43 @@ import {
     computeProjectedBalance,
     fetchBalanceOverview,
     fromCents,
-    toCents
+    toCents,
+    todayISO
 } from '@/features/bank-accounts/services/balances'
+import { fetchCardsOverview, openInvoicesUntil } from '@/features/credit-cards/services/invoices'
 
 // --- Tool Schemas ---
 
+// Opcionais usam .nullish(): alguns modelos (ex.: gpt-oss na Groq) enviam null em vez de
+// omitir o campo, e o provedor valida os argumentos contra o schema. Padrões ficam no código.
+
 export const getBalanceSchema = z.object({
-    month: z.number().optional().describe('Mês numérico (1-12). Padrão: mês atual.'),
-    year: z.number().optional().describe('Ano (ex: 2024). Padrão: ano atual.')
+    month: z.number().int().nullish().describe('Mês numérico (1-12). Omita para o mês atual.'),
+    year: z.number().int().nullish().describe('Ano (ex: 2026). Omita para o ano atual.')
 })
 
 export const getTransactionsSchema = z.object({
-    limit: z.number().optional().default(10).describe('Número de transações para buscar.'),
-    type: z.enum(['receita', 'despesa', 'todos']).optional().default('todos').describe('Filtrar por tipo.')
+    limit: z.number().int().nullish().describe('Número de transações para buscar. Padrão: 10.'),
+    type: z.enum(['receita', 'despesa', 'todos']).nullish().describe('Filtrar por tipo. Padrão: todos.')
 })
 
 export const getUpcomingBillsSchema = z.object({
-    days: z.number().optional().default(7).describe('Quantos dias à frente verificar.')
+    days: z.number().int().nullish().describe('Quantos dias à frente verificar. Padrão: 7.')
 })
 
 export const addTransactionSchema = z.object({
     descricao: z.string().describe('Descrição da transação (ex: "Almoço", "Freela").'),
-    valor: z.number().describe('Valor da transação.'),
-    tipo: z.enum(['PF', 'PJ']).default('PF').describe('Tipo de conta (PF ou PJ).'),
+    valor: z.number().positive().describe('Valor da transação (positivo).'),
+    tipo: z.enum(['PF', 'PJ']).nullish().describe('Perfil: PF ou PJ. Padrão: PF.'),
     tipo_transacao: z.enum(['receita', 'despesa']).describe('Se é receita ou despesa.'),
-    data_vencimento: z.string().optional().describe('Data de vencimento (ISO string). Padrão: hoje.'),
-    categoria_nome: z.string().optional().describe('Nome da categoria para tentar inferir o ID.')
+    data_vencimento: z.string().nullish().describe('Data no formato YYYY-MM-DD. Padrão: hoje.'),
+    categoria_nome: z.string().nullish().describe('Nome da categoria para tentar inferir o ID.'),
+    pago: z.boolean().nullish().describe(
+        'true se o dinheiro JÁ saiu/entrou (ex.: "gastei", "paguei", "recebi"); false se é uma conta a pagar/receber no futuro. Padrão: false.'
+    ),
+    conta_nome: z.string().nullish().describe(
+        'Nome da conta bancária citada pelo usuário (ex.: "Nubank"). Se omitido, usa a conta padrão do usuário.'
+    )
 })
 
 // --- Core Logic (Dependency Injection) ---
@@ -42,20 +53,21 @@ export const addTransactionSchema = z.object({
  * - saldo_previsto: saldo disponível + lançamentos em aberto até o fim do mês.
  * - mes: receitas/despesas do mês por vencimento (competência).
  */
-export const getBalanceCore = async (supabase: SupabaseClient, month?: number, year?: number) => {
-    const targetMonth = month || new Date().getMonth() + 1
+export const getBalanceCore = async (supabase: SupabaseClient, month?: number | null, year?: number | null) => {
+    const targetMonth = month && month >= 1 && month <= 12 ? month : new Date().getMonth() + 1
     const targetYear = year || new Date().getFullYear()
 
     const startDate = formatDateToISO(new Date(targetYear, targetMonth - 1, 1))
     const endDate = formatDateToISO(new Date(targetYear, targetMonth, 0))
 
-    const [{ data: transactions, error }, overview] = await Promise.all([
+    const [{ data: transactions, error }, overview, cards] = await Promise.all([
         supabase
             .from('transacoes')
             .select('valor, tipo_transacao, status')
             .gte('data_vencimento', startDate)
             .lte('data_vencimento', endDate),
-        fetchBalanceOverview<{ id: string; nome: string; saldo_inicial: number }>(supabase)
+        fetchBalanceOverview<{ id: string; nome: string; saldo_inicial: number }>(supabase),
+        fetchCardsOverview(supabase)
     ])
 
     if (error) throw new Error(`Erro ao buscar saldo: ${error.message}`)
@@ -73,12 +85,15 @@ export const getBalanceCore = async (supabase: SupabaseClient, month?: number, y
     }
 
     const projection = computeProjectedBalance(overview.saldo_disponivel, overview.transactions, endDate)
+    const faturas = openInvoicesUntil(cards.invoices, endDate)
 
     return {
         month: targetMonth,
         year: targetYear,
         saldo_disponivel: overview.saldo_disponivel,
-        saldo_previsto_fim_do_mes: projection.saldo_previsto,
+        // Mesma regra do dashboard: desconta faturas de cartão a vencer até o fim do mês
+        saldo_previsto_fim_do_mes: fromCents(toCents(projection.saldo_previsto) - toCents(faturas)),
+        faturas_cartao_a_pagar: faturas,
         contas: overview.accounts.map(a => ({ nome: a.nome, saldo: a.saldo_atual })),
         mes: {
             receitas: fromCents(mes.receitas),
@@ -90,7 +105,7 @@ export const getBalanceCore = async (supabase: SupabaseClient, month?: number, y
     }
 }
 
-export const getRecentTransactionsCore = async (supabase: any, limit: number, type: 'todos' | 'receita' | 'despesa') => {
+export const getRecentTransactionsCore = async (supabase: SupabaseClient, limit: number, type: 'todos' | 'receita' | 'despesa') => {
     let query = supabase
         .from('transacoes')
         .select('id, descricao, valor, tipo_transacao, status, data_vencimento, categoria:categorias(nome)')
@@ -106,68 +121,133 @@ export const getRecentTransactionsCore = async (supabase: any, limit: number, ty
     return data
 }
 
-export const getUpcomingBillsCore = async (supabase: any, days: number) => {
-    const today = formatDateToISO(new Date())
+/** Despesas em aberto (inclui atrasadas) até `days` dias + faturas de cartão a vencer. */
+export const getUpcomingBillsCore = async (supabase: SupabaseClient, days: number) => {
+    const today = todayISO()
     const futureDate = formatDateToISO(new Date(new Date().setDate(new Date().getDate() + days)))
 
-    const { data, error } = await supabase
-        .from('transacoes')
-        .select('*')
-        .eq('tipo_transacao', 'despesa')
-        .eq('status', 'pendente')
-        .gte('data_vencimento', today)
-        .lte('data_vencimento', futureDate)
-        .order('data_vencimento', { ascending: true })
+    const [{ data, error }, cards] = await Promise.all([
+        supabase
+            .from('transacoes')
+            .select('descricao, valor, data_vencimento, conta:contas_bancarias(nome)')
+            .eq('tipo_transacao', 'despesa')
+            .neq('status', 'liquidado')
+            .is('cartao_id', null)
+            .lte('data_vencimento', futureDate)
+            .order('data_vencimento', { ascending: true })
+            .limit(50),
+        fetchCardsOverview(supabase, today)
+    ])
 
     if (error) throw new Error(`Erro ao buscar contas: ${error.message}`)
-    return data
+
+    const faturas = cards.cards.flatMap(card =>
+        card.invoices
+            .filter(inv => inv.status !== 'paga' && inv.em_aberto > 0 && inv.vencimento <= futureDate)
+            .map(inv => ({
+                cartao: card.nome,
+                valor: inv.em_aberto,
+                vencimento: inv.vencimento,
+                atrasada: inv.vencimento < today
+            }))
+    )
+
+    return {
+        hoje: today,
+        contas: (data ?? []).map(t => ({ ...t, atrasada: t.data_vencimento < today })),
+        faturas_cartao: faturas
+    }
 }
 
-export const addTransactionCore = async (supabase: any, user_id: string, params: z.infer<typeof addTransactionSchema>) => {
-    // Tentar achar categoria
-    let categoria_id = null
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Remove curingas do LIKE para buscar o texto literal informado pelo usuário/modelo. */
+const likeLiteral = (s: string) => s.replace(/[%_\\]/g, ch => `\\${ch}`)
+
+/**
+ * Cria uma transação a partir da IA (chat) ou da automação do WhatsApp.
+ * Atenção: no WhatsApp o cliente é service-role (ignora RLS), então TODAS as consultas
+ * filtram explicitamente por usuario_id.
+ * Conta: a citada pelo nome → a conta padrão → a única conta do usuário → sem conta.
+ */
+export const addTransactionCore = async (
+    supabase: SupabaseClient,
+    user_id: string,
+    params: z.infer<typeof addTransactionSchema>
+) => {
+    if (!UUID_RE.test(user_id)) throw new Error('Usuário inválido.')
+
+    // Categoria do usuário ou global, primeiro pelo nome, depois a primeira do tipo
+    let categoria_id: string | null = null
     if (params.categoria_nome) {
-        const { data: cats } = await supabase
+        const { data: cat } = await supabase
             .from('categorias')
             .select('id')
-            .ilike('nome', `%${params.categoria_nome}%`)
+            .or(`usuario_id.eq.${user_id},usuario_id.is.null`)
+            .ilike('nome', `%${likeLiteral(params.categoria_nome)}%`)
             .limit(1)
-            .single()
-        if (cats) categoria_id = cats.id
+            .maybeSingle()
+        if (cat) categoria_id = cat.id
     }
-
     if (!categoria_id) {
         const { data: defaultCat } = await supabase
             .from('categorias')
             .select('id')
+            .or(`usuario_id.eq.${user_id},usuario_id.is.null`)
             .eq('tipo', params.tipo_transacao)
             .limit(1)
-            .single()
+            .maybeSingle()
         if (defaultCat) categoria_id = defaultCat.id
     }
-
     if (!categoria_id) throw new Error("Não foi possível identificar uma categoria para esta transação.")
+
+    const { data: contas, error: contasError } = await supabase
+        .from('contas_bancarias')
+        .select('id, nome, padrao')
+        .eq('usuario_id', user_id)
+    if (contasError) throw new Error(`Erro ao buscar contas: ${contasError.message}`)
+
+    const lista = (contas ?? []) as Array<{ id: string; nome: string; padrao: boolean }>
+    const citada = params.conta_nome
+        ? lista.find(c => c.nome.toLowerCase().includes(params.conta_nome!.toLowerCase()))
+        : undefined
+    const conta = citada ?? lista.find(c => c.padrao) ?? (lista.length === 1 ? lista[0] : undefined)
+
+    const data = params.data_vencimento && DATE_RE.test(params.data_vencimento.slice(0, 10))
+        ? params.data_vencimento.slice(0, 10)
+        : todayISO()
+    const pago = params.pago === true
 
     const transaction = {
         usuario_id: user_id,
         descricao: params.descricao,
         valor: params.valor,
-        tipo: params.tipo,
+        tipo: params.tipo ?? 'PF',
         tipo_transacao: params.tipo_transacao,
         categoria_id,
-        status: 'pendente',
-        data_vencimento: params.data_vencimento || formatDateToISO(new Date()),
+        conta_id: conta?.id ?? null,
+        status: pago ? 'liquidado' : 'pendente',
+        data_vencimento: data,
+        data_pagamento: pago ? data : null,
         is_recorrente: false
     }
 
-    const { data, error } = await supabase
+    const { data: saved, error } = await supabase
         .from('transacoes')
         .insert([transaction])
-        .select()
+        .select('id, descricao, valor, tipo_transacao, status, data_vencimento')
         .single()
 
     if (error) throw new Error(`Erro ao salvar: ${error.message}`)
-    return { success: true, transaction: data }
+    return {
+        success: true,
+        transaction: saved,
+        conta: conta?.nome ?? null,
+        aviso: conta
+            ? undefined
+            : 'Lançada sem conta bancária (nenhuma conta padrão definida). Ela não altera o saldo até ser vinculada a uma conta.'
+    }
 }
 
 // --- Default Implementations (Cookie Context) ---
@@ -179,12 +259,13 @@ export const getBalance = async ({ month, year }: z.infer<typeof getBalanceSchem
 
 export const getRecentTransactions = async ({ limit, type }: z.infer<typeof getTransactionsSchema>) => {
     const supabase = await createClient()
-    return getRecentTransactionsCore(supabase, limit, type)
+    const safeLimit = limit && limit > 0 ? Math.min(limit, 50) : 10
+    return getRecentTransactionsCore(supabase, safeLimit, type ?? 'todos')
 }
 
 export const getUpcomingBills = async ({ days }: z.infer<typeof getUpcomingBillsSchema>) => {
     const supabase = await createClient()
-    return getUpcomingBillsCore(supabase, days)
+    return getUpcomingBillsCore(supabase, days && days > 0 ? Math.min(days, 90) : 7)
 }
 
 export const addTransaction = async (params: z.infer<typeof addTransactionSchema>) => {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Filter, Download, Calendar, ArrowUpRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { Filter, Calendar, ArrowUpRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
@@ -28,6 +28,7 @@ import { EditTransactionDialog } from "@/features/transactions/components/edit-t
 import { DeleteTransactionDialog } from "@/features/transactions/components/delete-transaction-dialog"
 import { SettleTransactionDialog } from "@/features/transactions/components/settle-transaction-dialog"
 import { deriveStatus } from "@/features/bank-accounts/services/balances"
+import { ExportTransactionsButton } from "@/features/transactions/components/export-transactions-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DataTablePagination } from "@/components/data-table-pagination"
 import { cn, parseLocalDate } from "@/lib/utils"
@@ -261,9 +262,20 @@ export default function ReceitasPage() {
                         </div>
                         <ReplicateDialog transactions={transactions} onSuccess={refresh} />
                     </div>
-                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground w-full sm:w-auto justify-center">
-                        <Download className="mr-2 h-4 w-4" /> Exportar Planilha
-                    </Button>
+                    <ExportTransactionsButton
+                        filters={{
+                            month: selectedMonth,
+                            year: selectedYear,
+                            tipo_transacao: 'receita',
+                            tipo: tipoFilter === 'todos' ? undefined : tipoFilter,
+                            status: statusFilter === 'todos' ? undefined : statusFilter,
+                            categoria_id: categoriaFilter === 'todas' ? undefined : categoriaFilter,
+                            sortBy,
+                            sortOrder,
+                        }}
+                        fileName={`receitas_${selectedYear}_${String(selectedMonth).padStart(2, '0')}`}
+                        className="text-muted-foreground hover:text-foreground w-full sm:w-auto justify-center"
+                    />
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>

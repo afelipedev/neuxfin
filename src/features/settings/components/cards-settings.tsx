@@ -113,9 +113,14 @@ export function CardsSettings() {
             setDeletingId(null)
             fetchCards()
         } catch (error) {
+            // 23503: bloqueado pelo banco (cartão com compras ou faturas pagas)
+            const err = error as { code?: string; message?: string }
             toast.error("Erro ao excluir", {
-                description: "Não foi possível excluir o cartão."
+                description: err?.code === '23503'
+                    ? (err.message?.includes('compras') ? err.message : "Este cartão possui faturas pagas e não pode ser excluído.")
+                    : "Não foi possível excluir o cartão."
             })
+            setDeletingId(null)
         }
     }
 
@@ -339,8 +344,8 @@ export function CardsSettings() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. Isso excluirá permanentemente o cartão de crédito
-                            e todas as faturas e transações associadas a ele.
+                            Esta ação não pode ser desfeita. Só é possível excluir cartões sem compras lançadas
+                            e sem faturas pagas.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

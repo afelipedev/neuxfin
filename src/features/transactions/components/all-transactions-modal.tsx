@@ -40,7 +40,8 @@ import { useCategories } from "@/features/settings/hooks/use-categories"
 import { CategoryPieChart } from "@/features/dashboard/components/category-pie-chart"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-// import * as XLSX from 'xlsx' // Removido para import dinâmico em handleExport
+import { toast } from "sonner"
+import { exportTransactionsXlsx } from "../services/export"
 import { DataTablePagination } from "@/components/data-table-pagination"
 import { cn, parseLocalDate } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
@@ -101,21 +102,22 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
     }, [allTransactions])
 
     const handleExport = async () => {
-        const XLSX = await import('xlsx')
-        const dataToExport = allTransactions.map(t => ({
-            Descrição: t.descricao,
-            Valor: t.valor,
-            Tipo: t.tipo.toUpperCase(),
-            Perfil: t.tipo_transacao,
-            Categoria: (t as any).categoria?.nome || 'N/A',
-            Data: format(parseLocalDate(t.data_vencimento), 'dd/MM/yyyy'),
-            Status: t.status.toUpperCase()
-        }))
-
-        const ws = XLSX.utils.json_to_sheet(dataToExport)
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, "Transações")
-        XLSX.writeFile(wb, `relatorio_transacoes_${month}_${year}.xlsx`)
+        try {
+            const total = await exportTransactionsXlsx(
+                {
+                    month: filters.month,
+                    year: filters.year,
+                    tipo: filters.tipo,
+                    tipo_transacao: filters.tipo_transacao,
+                    categoria_id: filters.categoria_id,
+                },
+                `relatorio_transacoes_${year}_${String(month).padStart(2, '0')}`
+            )
+            toast.success(`${total} transação(ões) exportada(s)`)
+        } catch (err) {
+            console.error(err)
+            toast.error("Erro ao exportar transações")
+        }
     }
 
     const formatCurrency = (value: number) => {

@@ -19,7 +19,7 @@ There is no test suite configured.
 ### Tech Stack
 - **UI**: shadcn/ui (new-york style) with Radix primitives, Tailwind CSS 4, `next-themes` for dark mode, `sonner` toasts
 - **Backend**: Supabase (auth + Postgres with RLS)
-- **AI**: Vercel AI SDK v6 (`ai`, `@ai-sdk/openai`, `@ai-sdk/react`) using `gpt-4o-mini`
+- **AI**: Vercel AI SDK v6 (`ai`, `@ai-sdk/groq`, `@ai-sdk/openai`, `@ai-sdk/react`). The model is chosen per user in Configurações → IA (default suggestion: Groq `openai/gpt-oss-20b`)
 - **Charts**: Recharts. **Forms**: react-hook-form + Zod 4. **Export**: `xlsx`
 
 ### Auth and Supabase clients
@@ -35,25 +35,33 @@ Each feature groups `components/`, `hooks/`, `services/` (and sometimes `context
 - `transactions/`: core CRUD for `transacoes` plus month stats in `services/transactions.ts`. `TransactionContext` exposes an `updateCounter` plus `notifyTransactionChange()`. Any component that mutates transactions must call `notifyTransactionChange()`, and data-fetching hooks include `updateCounter` in their deps so dashboard widgets, lists, and charts refetch. Use `useTransactionContextOptional()` in components that may render outside the provider.
 - `ai-chat/`: chat window plus `tools/finance-tools.ts`. Each tool has a Zod schema, a `*Core(supabase, ...)` function that takes an injected Supabase client, and a thin wrapper that builds the cookie-based server client. Reuse the `*Core` functions when adding new AI entry points.
 - `calculator/`: intelligent calculator with a data selector, toggled by Ctrl/Cmd+K (shortcut wired in the dashboard layout).
+- `credit-cards/`: `services/invoices.ts` computes faturas (pure functions: cycle, status, limit used) plus `fetchCardsOverview`, `payInvoice` and `reverseInvoicePayment`. Pages `/cartoes` and `/cartoes/[id]`.
+- `reports/`: `services/reports.ts` (`buildReport` is pure) feeds `/relatorios` and `api/insights`. `dashboard/services/dashboard-alerts.ts` builds the dashboard's upcoming payments and health alerts.
+- `ai-models/`: per-user LLM config (Configurações → IA, `?tab=ia`). `server/resolve-model.ts` → `resolveModel(userId, { usage: 'chat' | 'analise' } | { modelId })` returns the AI SDK model plus `providerOptions`; it reads the key through the service-role-only RPC `obter_modelo_ia`, falling back to `GROQ_API_KEY`/`OPENAI_API_KEY` when no model is configured. `describeAIError()` maps provider errors to user-facing messages. Every AI route must use `resolveModel`, never a hardcoded provider. The client service never reads keys (only `chave_final`).
 - `cofrinhos/` (savings goals), `subscriptions/` (`assinaturas`), `bank-accounts/`, `settings/` (categories, profile), `dashboard/` (sidebar, summary cards, charts), `auth/`.
 
 `src/app/(dashboard)/layout.tsx` is a client layout that mounts `TransactionProvider`, `SidebarProvider`, the AI chat window, and the calculator for all dashboard pages.
 
 ### API routes
-- `api/chat/route.ts`: streaming chat (`streamText` → `toUIMessageStreamResponse()`) with tools `get_balance`, `get_recent_transactions`, `get_upcoming_bills`, `add_transaction`. It runs as the logged-in user via cookies. The system prompt defines the "Amigão" persona.
-- `api/agent/process/route.ts`: non-streaming endpoint (`generateText`) for external automations (WhatsApp text/audio transcripts). It receives `{ message, userId }` and uses a **service-role** Supabase client, so it bypasses RLS and only calls `addTransactionCore`. Callers must send `Authorization: Bearer <AGENT_API_SECRET>`. The check fails closed (401) when the env var is missing.
+- `api/chat/route.ts`: streaming chat (`streamText` → `toUIMessageStreamResponse()`) with tools `get_balance`, `get_recent_transactions`, `get_upcoming_bills`, `add_transaction`. It converts UI messages with `convertToModelMessages` and uses `stopWhen: stepCountIs(5)` so the model answers after tool calls. It runs as the logged-in user via cookies. The system prompt defines the "Amigão" persona.
+- `api/chat` and `api/insights` require a logged-in user (401) and resolve the model with usage `chat` / `analise`; `api/agent/process` uses the target user's `chat` model. `api/ai-models/test` runs a minimal call to validate a saved model.
+- `api/insights/route.ts`: AI analysis for `/relatorios` (`generateText` + `Output.object`). It sends only aggregated report numbers to the model.
+- `api/agent/process/route.ts`: non-streaming endpoint (`generateText`) for external automations (WhatsApp text/audio transcripts). It receives `{ message, userId }` and uses a **service-role** Supabase client, so it bypasses RLS and only calls `addTransactionCore`, which must filter every query by `usuario_id` explicitly. AI SDK v6 tools use `inputSchema` (not `parameters`). Callers must send `Authorization: Bearer <AGENT_API_SECRET>`. The check fails closed (401) when the env var is missing.
 
 ### Data Model
-Tables in use: `transacoes`, `categorias`, `contas_bancarias`, `cartoes_credito`, `assinaturas`, `cofrinhos`, `cofrinho_transacoes`, `transferencias`, `perfis`, plus the `avatars` storage bucket. Rows are scoped by `usuario_id` with RLS (policies are `to authenticated` with `(select auth.uid())` and `WITH CHECK`).
+Tables in use: `transacoes`, `categorias`, `contas_bancarias`, `cartoes_credito`, `assinaturas`, `cofrinhos`, `cofrinho_transacoes`, `transferencias`, `faturas_pagamentos`, `modelos_ia`, `perfis`, plus the `avatars` storage bucket. Rows are scoped by `usuario_id` with RLS (policies are `to authenticated` with `(select auth.uid())` and `WITH CHECK`).
 
 Migrations from 2026-11 onward live in `supabase/migrations/` and their filenames match the remote migration history (earlier ones exist only in Supabase). Integrity rules enforced in the database:
 - `transacoes`: `status` ∈ liquidado/pendente/atrasado, `valor > 0`, `liquidado ⇔ data_pagamento IS NOT NULL`, and `conta_id`/`cartao_id`/`categoria_id` must belong to the same user (trigger).
 - Deleting a bank account with linked transactions is blocked (trigger). Transfers and cofrinho movements use `ON DELETE RESTRICT`.
 - Deleting a cofrinho with balance and account-linked movements is blocked (trigger).
 - Cofrinho aporte/resgate must go through the RPC `registrar_movimento_cofrinho` (atomic, row lock, balance check). Never update `cofrinhos.saldo_atual` from the client.
+- Invoice payment must go through the RPC `pagar_fatura` (records `faturas_pagamentos` and settles the purchases, setting `fatura_pagamento_id`). Reversal goes through `estornar_fatura`, which is a soft reversal (`estornado_em`). At most one active payment per card and month.
+- `modelos_ia`: API keys live in Supabase Vault (`chave_secret_id`); `authenticated` can only SELECT the non-secret columns and writes go through the RPCs `salvar_modelo_ia` (create/update, empty key keeps the current one, marking a usage unsets it on the other models) and `remover_modelo_ia` (soft delete that overwrites the Vault secret). At most one active model per usage (`usar_chat`, `usar_analise`) per user.
+- Deleting a credit card with purchases is blocked (trigger). `contas_bancarias.padrao` allows at most one default account per user (partial unique index): unset the old default before setting a new one.
 - Installments are created in a single INSERT, with the parent id generated client-side. Deleting the parent installment alone re-links the others first, because the `transacao_pai_id` FK cascades.
 
-**Supabase MCP:** `apply_migration` auto-declines statements it considers destructive (`DROP ...`) in this environment. Use `ALTER POLICY`/`ALTER VIEW`/`CREATE OR REPLACE`/`REVOKE`, or add a new constraint instead of dropping the old one. Test risky SQL with `execute_sql` inside `begin; ... rollback;`.
+**Supabase MCP:** `apply_migration`/`execute_sql` auto-decline statements they consider destructive (`DROP ...`, and also `DELETE` even inside a function body) in this environment. Prefer soft deletes (timestamp column). Use `ALTER POLICY`/`ALTER VIEW`/`CREATE OR REPLACE`/`REVOKE`, or add a new constraint instead of dropping the old one. Test risky SQL with `execute_sql` inside `begin; ... rollback;`.
 
 `transacoes`:
 - `tipo_transacao`: `'receita' | 'despesa'`. `tipo`: `'PF' | 'PJ'`
@@ -69,7 +77,12 @@ Migrations from 2026-11 onward live in `supabase/migrations/` and their filename
 - **Saldo previsto (end of month)** = Saldo Disponível + pending receitas − pending/overdue despesas with `data_vencimento` ≤ end of the selected month (only those linked to an account).
 - Month cards (receitas/despesas do mês) use `data_vencimento` (competência). "Resultado do mês" = receitas − despesas of the month.
 - Liquidated transactions without `conta_id` (legacy, AI or subscriptions) do not affect any balance; they are counted and surfaced as a warning.
-- Card purchases (`cartao_id` set, no `conta_id`) do not touch balances. Invoices (faturas) are not implemented yet.
+- Card purchases (`cartao_id` set, no `conta_id`) do not touch balances. Their `data_vencimento` is the purchase date, and they never become `atrasado` on their own (the invoice is what falls due).
+- **Faturas** are computed, not stored:
+  - Cycle: a purchase made on or after the card's `dia_fechamento` goes to the next invoice. The invoice falls due in the same month as its closing date when `dia_vencimento > dia_fechamento`, otherwise in the following month. The invoice's competência is its due month.
+  - Paying an invoice debits one account. It is not a despesa: the purchase was already counted in its own month.
+  - Saldo previsto also subtracts open invoices due by the end of the month.
+  - Card limit used = open purchases, including future installments.
 - `atrasado` is derived on read (`pendente` and `data_vencimento` < today) via `deriveStatus()`.
 - Money is summed in cents (`toCents`/`fromCents`) to avoid float drift.
 
@@ -102,5 +115,5 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY   # Only for /api/agent/process
 AGENT_API_SECRET            # Shared secret required by /api/agent/process (Bearer token)
-OPENAI_API_KEY              # AI chat and agent
+GROQ_API_KEY / OPENAI_API_KEY  # Optional fallback when the user has no model configured in Configurações → IA
 ```

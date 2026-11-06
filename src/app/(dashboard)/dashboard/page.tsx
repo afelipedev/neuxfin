@@ -8,8 +8,11 @@ import {
     QuickBalanceDetail,
     UpcomingPayments,
     AlertCard,
-    QuickActions
 } from "@/features/dashboard/components/summary"
+import { useDashboardAlerts } from "@/features/dashboard/hooks/use-dashboard-alerts"
+import { NewTransactionMenu } from "@/features/transactions/components/new-transaction-menu"
+import { exportTransactionsXlsx } from "@/features/transactions/services/export"
+import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     Table,
@@ -28,7 +31,6 @@ import { BankAccountsBalance } from "@/features/bank-accounts/components/bank-ac
 import { DataTablePagination } from "@/components/data-table-pagination"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-// import * as XLSX from 'xlsx' // Removido para import dinâmico em handleExport
 import { cn, parseLocalDate } from "@/lib/utils"
 
 export default function DashboardPage() {
@@ -59,22 +61,27 @@ export default function DashboardPage() {
     const { data: cashFlowData, loading: loadingCashFlow } = useCashFlowData(12, true)
 
 
-    const handleExport = async () => {
-        const XLSX = await import('xlsx')
-        const dataToExport = transactions.map(t => ({
-            Descrição: t.descricao,
-            Valor: t.valor,
-            Tipo: t.tipo.toUpperCase(),
-            Perfil: t.tipo_transacao,
-            Categoria: (t as any).categoria?.nome || 'N/A',
-            Data: format(parseLocalDate(t.data_vencimento), 'dd/MM/yyyy'),
-            Status: t.status.toUpperCase()
-        }))
+    // Alerta de saldo previsto negativo só faz sentido para o mês corrente
+    const isCurrentMonth = month === new Date().getMonth() + 1 && year === new Date().getFullYear()
+    const { upcoming, alerts, loading: loadingAlerts } = useDashboardAlerts(
+        isCurrentMonth && !loadingStats ? stats.saldo_previsto : undefined
+    )
 
-        const ws = XLSX.utils.json_to_sheet(dataToExport)
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, "Transações")
-        XLSX.writeFile(wb, `transacoes_${month}_${year}.xlsx`)
+    const [exporting, setExporting] = React.useState(false)
+    const handleExport = async () => {
+        try {
+            setExporting(true)
+            const total = await exportTransactionsXlsx(
+                { month, year },
+                `transacoes_${year}_${String(month).padStart(2, '0')}`
+            )
+            toast.success(`${total} transação(ões) exportada(s)`)
+        } catch (err) {
+            console.error(err)
+            toast.error("Erro ao exportar transações")
+        } finally {
+            setExporting(false)
+        }
     }
 
     const formatCurrency = (value: number) => {
@@ -120,20 +127,13 @@ export default function DashboardPage() {
                             variant="outline"
                             size="sm"
                             onClick={handleExport}
+                            disabled={exporting}
                             className="hidden md:flex bg-secondary/50 dark:bg-zinc-100/5 border border-border h-10 px-4 rounded-xl text-[10px] uppercase font-black tracking-widest hover:bg-brand-1 hover:text-zinc-950 transition-all font-display text-foreground"
                         >
                             <Download className="mr-2 h-3 w-3" />
-                            Exportar
+                            {exporting ? "Exportando..." : "Exportar"}
                         </Button>
-                        <TransactionForm
-                            type="receita"
-                            trigger={
-                                <Button className="bg-brand-1 hover:bg-brand-2 text-zinc-950 shadow-xl shadow-brand-1/10 h-10 px-6 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all hover:scale-105 active:scale-95 font-display border-none w-full sm:w-auto">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Nova Transação
-                                </Button>
-                            }
-                        />
+                        <NewTransactionMenu className="bg-brand-1 hover:bg-brand-2 text-zinc-950 shadow-xl shadow-brand-1/10 h-10 px-6 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all hover:scale-105 active:scale-95 font-display border-none w-full sm:w-auto" />
                     </div>
                 </div>
 
@@ -165,7 +165,7 @@ export default function DashboardPage() {
                     <CardHeader className="flex flex-row items-center justify-between p-6 pb-2">
                         <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Últimas Movimentações</CardTitle>
                         <div className="flex gap-2 text-xs">
-                            <Button variant="ghost" size="sm" onClick={handleExport} className="text-[10px] uppercase font-black tracking-widest text-muted-foreground hover:text-brand-1 transition-colors cursor-pointer active:scale-95">
+                            <Button variant="ghost" size="sm" onClick={handleExport} disabled={exporting} className="text-[10px] uppercase font-black tracking-widest text-muted-foreground hover:text-brand-1 transition-colors cursor-pointer active:scale-95">
                                 <Download className="mr-2 h-3 w-3" /> Exportar
                             </Button>
                             <AllTransactionsModal
@@ -285,8 +285,8 @@ export default function DashboardPage() {
 
                 <BankAccountsBalance />
 
-                <UpcomingPayments />
-                <AlertCard />
+                <UpcomingPayments items={upcoming} loading={loadingAlerts} />
+                <AlertCard alerts={alerts} loading={loadingAlerts} />
             </div>
         </div>
     )

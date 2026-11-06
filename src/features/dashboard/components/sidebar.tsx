@@ -8,6 +8,7 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     Repeat,
+    CreditCard,
     Wallet,
     PieChart,
     Settings,
@@ -46,6 +47,11 @@ const items = [
         title: "Despesas",
         url: "/despesas",
         icon: ArrowDownRight,
+    },
+    {
+        title: "Cartões",
+        url: "/cartoes",
+        icon: CreditCard,
     },
     {
         title: "Assinaturas",
