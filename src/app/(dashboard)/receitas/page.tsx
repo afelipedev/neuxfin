@@ -1,5 +1,6 @@
 "use client"
 
+import { RecurrenceBadge } from "@/features/transactions/components/recurrence-badge"
 import { useState } from "react"
 import { Calendar, ArrowUpRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -320,6 +321,7 @@ export default function ReceitasPage() {
                                                     ({transaction.parcela_atual}/{transaction.total_parcelas})
                                                 </span>
                                             )}
+                                            <RecurrenceBadge transaction={transaction} />
                                         </TableCell>
                                         <TableCell className="hidden md:table-cell">
                                             <Badge className={`${transaction.tipo === 'PJ'

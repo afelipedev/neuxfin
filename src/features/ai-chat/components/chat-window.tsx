@@ -10,8 +10,23 @@ import { Input } from "@/components/ui/input"
 import { useChat } from '@ai-sdk/react'
 import { cn } from "@/lib/utils"
 
-export function AIChatWindow({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+interface AIChatWindowProps {
+    isOpen: boolean
+    onClose: () => void
+    /** Pergunta enviada de fora (ex.: busca do cabeçalho); `id` muda a cada envio */
+    pendingQuestion?: { id: number; text: string } | null
+}
+
+export function AIChatWindow({ isOpen, onClose, pendingQuestion }: AIChatWindowProps) {
     const { messages, sendMessage, status, error } = useChat()
+
+    // Envia uma vez cada pergunta vinda de fora
+    const sentQuestionId = React.useRef<number | null>(null)
+    React.useEffect(() => {
+        if (!pendingQuestion || sentQuestionId.current === pendingQuestion.id) return
+        sentQuestionId.current = pendingQuestion.id
+        sendMessage({ text: pendingQuestion.text })
+    }, [pendingQuestion, sendMessage])
     // A rota responde {"error": "..."}; o transport repassa o corpo como mensagem
     const errorMessage = React.useMemo(() => {
         if (!error) return null

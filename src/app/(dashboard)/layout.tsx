@@ -3,11 +3,15 @@
 import * as React from "react"
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { DashboardSidebar } from "@/features/dashboard/components/sidebar"
-import { MessageSquare, Search, Bell, Sun, Moon } from "lucide-react"
+import { MessageSquare, Sun, Moon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AIChatWindow } from "@/features/ai-chat/components/chat-window"
 import { IntelligentCalculator } from "@/features/calculator/components/calculator"
 import { TransactionProvider } from "@/features/transactions/context/transaction-context"
+import { SubscriptionAutoGenerator } from "@/features/subscriptions/components/subscription-auto-generator"
+import { HeaderSearch } from "@/features/dashboard/components/header-search"
+import { HeaderNotifications } from "@/features/dashboard/components/header-notifications"
+import { HeaderUserMenu } from "@/features/dashboard/components/header-user-menu"
 import { useTheme } from "next-themes"
 import { usePathname } from "next/navigation"
 
@@ -18,6 +22,13 @@ export default function DashboardLayout({
 }) {
     const [isChatOpen, setIsChatOpen] = React.useState(false)
     const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false)
+    const [pendingQuestion, setPendingQuestion] = React.useState<{ id: number; text: string } | null>(null)
+
+    // Pergunta vinda da busca do cabeçalho: abre o chat e envia
+    const askAI = React.useCallback((text: string) => {
+        setPendingQuestion({ id: Date.now(), text })
+        setIsChatOpen(true)
+    }, [])
     const { theme, setTheme } = useTheme()
     const pathname = usePathname()
     const [mounted, setMounted] = React.useState(false)
@@ -40,6 +51,7 @@ export default function DashboardLayout({
 
     return (
         <TransactionProvider>
+            <SubscriptionAutoGenerator />
             <SidebarProvider>
                 <div className="flex min-h-screen w-full bg-background font-body transition-colors duration-300">
                     <DashboardSidebar />
@@ -47,32 +59,21 @@ export default function DashboardLayout({
                         <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border bg-background/50 px-4 sm:px-6 backdrop-blur-xl justify-between">
                             <div className="flex items-center gap-4">
                                 <SidebarTrigger className="-ml-1 hover:text-brand-1 transition-colors" />
-                                <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-zinc-900/5 dark:bg-zinc-100/5 border border-border min-w-[320px] focus-within:border-brand-1/50 focus-within:bg-brand-1/5 transition-all group">
-                                    <Search className="h-4 w-4 text-muted-foreground group-focus-within:text-brand-1 transition-colors" />
-                                    <input
-                                        type="text"
-                                        placeholder="Consultar transações, documentos ou IA..."
-                                        className="bg-transparent border-none outline-none text-xs w-full placeholder:text-muted-foreground/50 font-medium text-foreground"
-                                    />
-                                </div>
+                                <HeaderSearch onAskAI={askAI} />
                             </div>
 
                             <div className="flex items-center gap-4">
-                                <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-brand-1 hover:bg-brand-1/10 rounded-xl transition-all">
-                                    <Bell className="h-5 w-5" />
-                                    <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-brand-1 border-2 border-background animate-pulse" />
-                                </Button>
+                                <HeaderNotifications />
                                 <Button
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                                    aria-label={mounted && theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
                                     className="text-muted-foreground hover:text-brand-1 hover:bg-brand-1/10 rounded-xl transition-all"
                                 >
                                     {mounted && theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                                 </Button>
-                                <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-brand-1 to-brand-3 flex items-center justify-center text-zinc-950 text-xs font-black border border-white/10 shadow-lg shadow-brand-1/10 cursor-pointer hover:scale-105 transition-transform font-display">
-                                    AF
-                                </div>
+                                <HeaderUserMenu />
                             </div>
                         </header>
 
@@ -89,7 +90,7 @@ export default function DashboardLayout({
                             <MessageSquare className="h-6 w-6 sm:h-6 sm:w-6 lg:h-7 lg:w-7 group-hover:rotate-12 transition-transform" />
                         </Button>
 
-                        <AIChatWindow isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+                        <AIChatWindow isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} pendingQuestion={pendingQuestion} />
 
                         <IntelligentCalculator isOpen={isCalculatorOpen} onOpenChange={setIsCalculatorOpen} />
 

@@ -4,7 +4,7 @@ import * as React from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Plus, CreditCard, Edit } from "lucide-react"
+import { Plus, CreditCard, Edit, Landmark } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -34,6 +34,10 @@ import {
 import { useSubscriptionActions } from "../hooks/use-subscriptions"
 import { createClient } from "@/lib/supabase/client"
 import { Subscription } from "../services/subscriptions"
+import { todayISO } from "@/features/bank-accounts/services/balances"
+
+/** Valor do Select para "nenhum": Radix Select não aceita string vazia como item */
+const NONE = "__none__"
 
 const formSchema = z.object({
     nome: z.string().min(2, {
@@ -43,6 +47,8 @@ const formSchema = z.object({
     descricao: z.string().optional(),
     categoria_id: z.string().optional(),
     cartao_id: z.string().optional(),
+    conta_id: z.string().optional(),
+    data_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data de início"),
     frequencia: z.enum(["mensal", "anual", "semanal", "trimestral"]),
     data_vencimento_dia: z.number().min(1).max(31),
     status: z.enum(["ativo", "pausado", "cancelado"]),
@@ -66,6 +72,12 @@ interface CreditCardType {
     cor: string | null
 }
 
+interface BankAccountOption {
+    id: string
+    nome: string
+    padrao: boolean
+}
+
 interface SubscriptionFormModalProps {
     subscription?: Subscription | null
     onSuccess?: () => void
@@ -76,6 +88,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
     const [open, setOpen] = React.useState(false)
     const [categories, setCategories] = React.useState<Category[]>([])
     const [creditCards, setCreditCards] = React.useState<CreditCardType[]>([])
+    const [accounts, setAccounts] = React.useState<BankAccountOption[]>([])
     const { create, update, loading } = useSubscriptionActions()
 
     const isEditing = !!subscription
@@ -88,6 +101,8 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
             descricao: "",
             categoria_id: "",
             cartao_id: "",
+            conta_id: "",
+            data_inicio: todayISO(),
             frequencia: "mensal",
             data_vencimento_dia: 1,
             status: "ativo",
@@ -96,6 +111,10 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
             cor: "",
         },
     })
+
+    const cartaoId = form.watch("cartao_id")
+    const frequencia = form.watch("frequencia")
+    const contaPadrao = accounts.find(a => a.padrao)
 
     // Quando abrir o modal e houver uma assinatura para editar
     React.useEffect(() => {
@@ -106,6 +125,8 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                 descricao: subscription.descricao || "",
                 categoria_id: subscription.categoria_id || "",
                 cartao_id: subscription.cartao_id || "",
+                conta_id: subscription.conta_id || "",
+                data_inicio: subscription.data_inicio?.slice(0, 10) || todayISO(),
                 frequencia: subscription.frequencia || "mensal",
                 data_vencimento_dia: subscription.data_vencimento_dia || 1,
                 status: subscription.status || "ativo",
@@ -120,6 +141,8 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                 descricao: "",
                 categoria_id: "",
                 cartao_id: "",
+                conta_id: "",
+                data_inicio: todayISO(),
                 frequencia: "mensal",
                 data_vencimento_dia: 1,
                 status: "ativo",
@@ -150,6 +173,13 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                 .order('nome')
 
             if (cardsData) setCreditCards(cardsData)
+
+            const { data: accountsData } = await supabase
+                .from('contas_bancarias')
+                .select('id, nome, padrao')
+                .order('nome')
+
+            if (accountsData) setAccounts(accountsData)
         }
         if (open) loadData()
     }, [open])
@@ -162,6 +192,9 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                 descricao: values.descricao || null,
                 categoria_id: values.categoria_id || null,
                 cartao_id: values.cartao_id || null,
+                // No cartão a despesa entra na fatura; a conta só vale fora dele
+                conta_id: values.cartao_id ? null : (values.conta_id || null),
+                data_inicio: values.data_inicio,
                 frequencia: values.frequencia,
                 data_vencimento_dia: values.data_vencimento_dia,
                 status: values.status,
@@ -296,13 +329,36 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                             />
                         </div>
 
+                        <FormField
+                            control={form.control}
+                            name="data_inicio"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Início da cobrança</FormLabel>
+                                    <FormControl>
+                                        <Input type="date" {...field} />
+                                    </FormControl>
+                                    <p className="text-xs text-muted-foreground">
+                                        {frequencia === "anual"
+                                            ? "Cobrada todo ano no mês desta data."
+                                            : frequencia === "trimestral"
+                                                ? "Cobrada a cada 3 meses a partir do mês desta data."
+                                                : frequencia === "semanal"
+                                                    ? "Cobrada a cada 7 dias a partir desta data."
+                                                    : "Nenhuma despesa é lançada antes desta data."}
+                                    </p>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="data_vencimento_dia"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Dia do Vencimento</FormLabel>
+                                        <FormLabel>{frequencia === "semanal" ? "Dia (não usado no semanal)" : "Dia do Vencimento"}</FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="number"
@@ -377,13 +433,14 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                                         <CreditCard className="h-4 w-4" />
                                         Cartão de Crédito (opcional)
                                     </FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                                    <Select onValueChange={(v) => field.onChange(v === NONE ? "" : v)} value={field.value || NONE}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Vincular a um cartão" />
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
+                                            <SelectItem value={NONE}>Sem cartão (paga por conta)</SelectItem>
                                             {creditCards.map((card) => (
                                                 <SelectItem key={card.id} value={card.id}>
                                                     <div className="flex items-center gap-2">
@@ -398,12 +455,46 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                                         </SelectContent>
                                     </Select>
                                     <p className="text-xs text-muted-foreground">
-                                        Vincule um cartão para melhor controle dos gastos
+                                        No cartão, a despesa entra na fatura e não desconta do saldo da conta.
                                     </p>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
+
+                        {!cartaoId && (
+                            <FormField
+                                control={form.control}
+                                name="conta_id"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                            <Landmark className="h-4 w-4" />
+                                            Conta de pagamento
+                                        </FormLabel>
+                                        <Select onValueChange={(v) => field.onChange(v === NONE ? "" : v)} value={field.value || NONE}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Conta padrão" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value={NONE}>
+                                                    Conta padrão{contaPadrao ? ` (${contaPadrao.nome})` : " (nenhuma definida)"}
+                                                </SelectItem>
+                                                {accounts.map((account) => (
+                                                    <SelectItem key={account.id} value={account.id}>{account.nome}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground">
+                                            Conta debitada quando a despesa da assinatura for paga.
+                                        </p>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
 
                         <FormField
                             control={form.control}

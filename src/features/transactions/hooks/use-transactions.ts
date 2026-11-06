@@ -12,6 +12,8 @@ import {
     EMPTY_DASHBOARD_STATS,
     createTransaction,
     createParceledTransaction,
+    createRecurringTransactions,
+    deleteRecurrenceFrom,
     updateTransaction,
     deleteTransaction,
     deleteAllInstallments,
@@ -167,12 +169,17 @@ export function useTransactionActions() {
 
     const create = useCallback(async (
         transaction: Omit<Transaction, 'id' | 'created_at'>,
-        parcelas?: number
+        parcelas?: number,
+        /** Repetir mensalmente por N meses (série recorrente); exclusivo com parcelas */
+        recorrenteMeses?: number
     ) => {
         try {
             setLoading(true)
 
-            if (parcelas && parcelas > 1) {
+            if (recorrenteMeses && recorrenteMeses > 1) {
+                await createRecurringTransactions(transaction, recorrenteMeses)
+                toast.success(`Lançamento recorrente criado para ${recorrenteMeses} meses!`)
+            } else if (parcelas && parcelas > 1) {
                 await createParceledTransaction(transaction, parcelas)
                 toast.success(`Transação parcelada criada com sucesso! (${parcelas}x)`)
             } else {
@@ -213,11 +220,22 @@ export function useTransactionActions() {
         }
     }, [notifyChange])
 
-    const remove = useCallback(async (id: string, deleteAll: boolean = false) => {
+    /**
+     * Exclui a transação. `deleteAll` remove todas as parcelas; `recurrence` remove este
+     * lançamento recorrente e os próximos da mesma série.
+     */
+    const remove = useCallback(async (
+        id: string,
+        deleteAll: boolean = false,
+        recurrence?: { recorrenciaId: string; aPartirDe: string }
+    ) => {
         try {
             setLoading(true)
 
-            if (deleteAll) {
+            if (recurrence) {
+                const n = await deleteRecurrenceFrom(recurrence.recorrenciaId, recurrence.aPartirDe)
+                toast.success(n === 1 ? 'Lançamento excluído!' : `${n} lançamentos recorrentes excluídos!`)
+            } else if (deleteAll) {
                 await deleteAllInstallments(id)
                 toast.success('Todas as parcelas foram excluídas!')
             } else {

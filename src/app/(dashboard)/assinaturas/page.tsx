@@ -1,7 +1,8 @@
 "use client"
 
 import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
-import { ExternalLink, Repeat, ShieldCheck, Zap, CreditCard, Loader2, RefreshCw } from "lucide-react"
+import { ExternalLink, Repeat, ShieldCheck, Zap, CreditCard, Landmark, Loader2, RefreshCw } from "lucide-react"
+import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -18,7 +19,7 @@ import { SubscriptionFormModal } from "@/features/subscriptions/components/subsc
 import { DeleteSubscriptionDialog } from "@/features/subscriptions/components/delete-subscription-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Subscription } from "@/features/subscriptions/services/subscriptions"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, parseLocalDate } from "@/lib/utils"
 
 // Mapeamento de cores para ícones
 const iconColors: Record<string, string> = {
@@ -40,6 +41,20 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 }
 
 // Mapeamento de frequência
+const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+
+/** Quando a assinatura cobra, conforme a frequência e a data de início. */
+function vencimentoLabel(sub: Subscription): string {
+    const inicio = parseLocalDate(sub.data_inicio)
+    const dia = sub.data_vencimento_dia ?? inicio.getDate()
+    switch (sub.frequencia) {
+        case "semanal": return `Toda semana desde ${format(inicio, "dd/MM")}`
+        case "anual": return `Todo ano em ${dia} de ${MESES[inicio.getMonth()]}`
+        case "trimestral": return `A cada 3 meses, dia ${dia}`
+        default: return `Todo dia ${dia}`
+    }
+}
+
 const frequenciaLabels: Record<string, string> = {
     mensal: 'Mensal',
     anual: 'Anual',
@@ -285,7 +300,7 @@ function SubscriptionRow({ subscription, onRefresh }: { subscription: Subscripti
                 </Badge>
             </TableCell>
             <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
-                Todo dia {subscription.data_vencimento_dia || 1}
+                {vencimentoLabel(subscription)}
             </TableCell>
             <TableCell className="hidden md:table-cell">
                 {subscription.cartao ? (
@@ -294,7 +309,10 @@ function SubscriptionRow({ subscription, onRefresh }: { subscription: Subscripti
                         <span className="text-xs">{subscription.cartao.nome}</span>
                     </div>
                 ) : (
-                    <span className="text-xs text-muted-foreground">-</span>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <Landmark className="h-3 w-3" />
+                        <span className="text-xs">{subscription.conta?.nome ?? "Conta padrão"}</span>
+                    </div>
                 )}
             </TableCell>
             <TableCell>

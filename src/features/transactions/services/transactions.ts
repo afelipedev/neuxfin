@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import { parseLocalDate, formatDateToISO, dateInMonthClamped } from '@/lib/utils'
+import { buildRecurringSeries } from './recurrence'
 import {
     BalanceTx,
     computeProjectedBalance,
@@ -39,6 +40,10 @@ export interface Transaction {
     parcela_atual: number | null
     total_parcelas: number | null
     transacao_pai_id?: string | null
+    /** Agrupa os lançamentos de uma série recorrente criada junta */
+    recorrencia_id?: string | null
+    /** Assinatura que gerou a despesa */
+    assinatura_id?: string | null
     created_at: string
 }
 
@@ -396,6 +401,68 @@ export async function deleteTransaction(id: string) {
         .eq('id', id)
 
     if (error) throw error
+}
+
+/**
+ * Busca transações pela descrição (busca do cabeçalho). Mais recentes primeiro.
+ * O texto é tratado como literal (curingas do LIKE escapados).
+ */
+export async function searchTransactions(term: string, limit = 8): Promise<Transaction[]> {
+    const q = term.trim()
+    if (q.length < 2) return []
+    const literal = q.replace(/[%_\\]/g, ch => `\\${ch}`)
+    const { data, error } = await supabase
+        .from('transacoes')
+        .select(`
+            *,
+            categoria:categorias(*),
+            conta:contas_bancarias(nome),
+            cartao:cartoes_credito(nome)
+        `)
+        .ilike('descricao', `%${literal}%`)
+        .order('data_vencimento', { ascending: false })
+        .limit(limit)
+
+    if (error) throw error
+    return (data ?? []) as Transaction[]
+}
+
+/**
+ * Cria uma série mensal recorrente (mesmo valor todo mês) em um único INSERT.
+ */
+export async function createRecurringTransactions(
+    transaction: Omit<Transaction, 'id' | 'created_at' | 'parcela_atual' | 'total_parcelas'>,
+    meses: number
+) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Usuário não autenticado')
+
+    const serie = buildRecurringSeries({ ...transaction, usuario_id: user.id }, meses, crypto.randomUUID())
+    const { data, error } = await supabase
+        .from('transacoes')
+        .insert(serie)
+        .select()
+
+    if (error) throw error
+    return data as Transaction[]
+}
+
+/**
+ * Exclui este lançamento recorrente e os próximos da mesma série.
+ * Mantém compras já quitadas por fatura (fatura_pagamento_id) para não desfazer o pagamento.
+ * Retorna quantos foram excluídos.
+ */
+export async function deleteRecurrenceFrom(recorrenciaId: string, aPartirDe: string): Promise<number> {
+    const { data, error } = await supabase
+        .from('transacoes')
+        .delete()
+        .eq('recorrencia_id', recorrenciaId)
+        .gte('data_vencimento', aPartirDe)
+        .is('fatura_pagamento_id', null)
+        .select('id')
+
+    if (error) throw error
+    return data?.length ?? 0
 }
 
 /**

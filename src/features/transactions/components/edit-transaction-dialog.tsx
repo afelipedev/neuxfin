@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,6 +31,9 @@ interface EditTransactionDialogProps {
     transaction: Transaction
     onSuccess?: () => void
     trigger?: React.ReactNode
+    /** Abertura controlada (ex.: resultado da busca do cabeçalho). Sem `trigger`, nenhum botão é renderizado. */
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
 }
 
 const NO_ACCOUNT = "__none__"
@@ -60,8 +63,14 @@ function toFormState(t: Transaction): FormState {
     }
 }
 
-export function EditTransactionDialog({ transaction, onSuccess, trigger }: EditTransactionDialogProps) {
-    const [open, setOpen] = useState(false)
+export function EditTransactionDialog({ transaction, onSuccess, trigger, open: openProp, onOpenChange }: EditTransactionDialogProps) {
+    const [internalOpen, setInternalOpen] = useState(false)
+    const isControlled = openProp !== undefined
+    const open = isControlled ? openProp : internalOpen
+    const setOpen = (next: boolean) => {
+        if (!isControlled) setInternalOpen(next)
+        onOpenChange?.(next)
+    }
     const { update, loading } = useTransactionActions()
     const { categories } = useCategories()
     const [accounts, setAccounts] = useState<BankAccount[]>([])
@@ -69,10 +78,14 @@ export function EditTransactionDialog({ transaction, onSuccess, trigger }: EditT
 
     const handleOpenChange = (next: boolean) => {
         setOpen(next)
-        if (!next) return
-        setFormData(toFormState(transaction))
-        settingsService.getBankAccounts().then(setAccounts).catch(console.error)
+        if (next) setFormData(toFormState(transaction))
     }
+
+    // Contas carregadas ao abrir (inclusive quando aberto de fora, já montado com open=true)
+    useEffect(() => {
+        if (!open) return
+        settingsService.getBankAccounts().then(setAccounts).catch(console.error)
+    }, [open])
 
     const isPaid = formData.status === 'liquidado'
     const isCardPurchase = !!transaction.cartao_id && formData.conta_id === NO_ACCOUNT
@@ -110,13 +123,15 @@ export function EditTransactionDialog({ transaction, onSuccess, trigger }: EditT
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>
-                {trigger || (
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" aria-label="Editar transação">
-                        <Edit className="h-3.5 w-3.5" />
-                    </Button>
-                )}
-            </DialogTrigger>
+            {(!isControlled || trigger) && (
+                <DialogTrigger asChild>
+                    {trigger || (
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" aria-label="Editar transação">
+                            <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                    )}
+                </DialogTrigger>
+            )}
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>Editar Transação</DialogTitle>

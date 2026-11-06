@@ -18,6 +18,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { useTransactionActions } from "../hooks/use-transactions"
 import { Transaction } from "../services/transactions"
+import { formatCurrency } from "@/lib/utils"
 
 interface DeleteTransactionDialogProps {
     transaction: Transaction
@@ -27,16 +28,26 @@ interface DeleteTransactionDialogProps {
 
 export function DeleteTransactionDialog({ transaction, onSuccess, trigger }: DeleteTransactionDialogProps) {
     const [open, setOpen] = useState(false)
-    const [deleteOption, setDeleteOption] = useState<'single' | 'all'>('single')
+    const [deleteOption, setDeleteOption] = useState<'single' | 'all' | 'next'>('single')
     const { remove, loading } = useTransactionActions()
 
-    const isInstallment = transaction.total_parcelas && transaction.total_parcelas > 1
+    const isInstallment = !!transaction.total_parcelas && transaction.total_parcelas > 1
+    const isRecurring = !isInstallment && !!transaction.recorrencia_id
 
     const handleDelete = async () => {
-        // "Só esta" exclui a própria parcela; "todas" parte da parcela pai
-        const success = deleteOption === 'all'
-            ? await remove(transaction.transacao_pai_id || transaction.id, true)
-            : await remove(transaction.id, false)
+        let success: boolean
+        if (deleteOption === 'next' && transaction.recorrencia_id) {
+            // Esta e as próximas da série recorrente
+            success = await remove(transaction.id, false, {
+                recorrenciaId: transaction.recorrencia_id,
+                aPartirDe: transaction.data_vencimento,
+            })
+        } else if (deleteOption === 'all') {
+            // "Todas" parte da parcela pai
+            success = await remove(transaction.transacao_pai_id || transaction.id, true)
+        } else {
+            success = await remove(transaction.id, false)
+        }
 
         if (success) {
             setOpen(false)
@@ -66,7 +77,7 @@ export function DeleteTransactionDialog({ transaction, onSuccess, trigger }: Del
                         <div className="mt-2 p-3 bg-zinc-900/5 dark:bg-zinc-100/5 rounded-lg">
                             <p className="font-medium">{transaction.descricao}</p>
                             <p className="text-sm text-muted-foreground">
-                                R$ {Number(transaction.valor).toFixed(2)}
+                                {formatCurrency(transaction.valor)}
                             </p>
                         </div>
                     </AlertDialogDescription>
@@ -75,7 +86,7 @@ export function DeleteTransactionDialog({ transaction, onSuccess, trigger }: Del
                 {isInstallment && (
                     <div className="space-y-3">
                         <p className="text-sm font-medium">Esta é uma transação parcelada:</p>
-                        <RadioGroup value={deleteOption} onValueChange={(value: 'single' | 'all') => setDeleteOption(value)}>
+                        <RadioGroup value={deleteOption} onValueChange={(value) => setDeleteOption(value as typeof deleteOption)}>
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="single" id="single" />
                                 <Label htmlFor="single" className="cursor-pointer">
@@ -87,6 +98,22 @@ export function DeleteTransactionDialog({ transaction, onSuccess, trigger }: Del
                                 <Label htmlFor="all" className="cursor-pointer">
                                     Excluir todas as {transaction.total_parcelas} parcelas
                                 </Label>
+                            </div>
+                        </RadioGroup>
+                    </div>
+                )}
+
+                {isRecurring && (
+                    <div className="space-y-3">
+                        <p className="text-sm font-medium">Este é um lançamento recorrente:</p>
+                        <RadioGroup value={deleteOption} onValueChange={(value) => setDeleteOption(value as typeof deleteOption)}>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="single" id="rec-single" />
+                                <Label htmlFor="rec-single" className="cursor-pointer">Excluir apenas este mês</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="next" id="rec-next" />
+                                <Label htmlFor="rec-next" className="cursor-pointer">Excluir este e os próximos meses</Label>
                             </div>
                         </RadioGroup>
                     </div>
