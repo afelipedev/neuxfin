@@ -9,17 +9,7 @@ import {
     DialogTrigger
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import {
-    Download,
-    ChevronRight,
-    ChevronLeft,
-    ArrowUpCircle,
-    ArrowDownCircle,
-    Calendar,
-    Filter,
-    PieChart as PieChartIcon,
-    Table as TableIcon
-} from "lucide-react"
+import { Download, ChevronRight, ChevronLeft, Filter, PieChart as PieChartIcon, Table as TableIcon } from "lucide-react"
 import {
     Table,
     TableBody,
@@ -43,13 +33,19 @@ import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
 import { exportTransactionsXlsx } from "../services/export"
 import { DataTablePagination } from "@/components/data-table-pagination"
-import { cn, parseLocalDate } from "@/lib/utils"
+import { cn, parseLocalDate, formatCurrency } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 
 interface AllTransactionsModalProps {
     initialMonth: number
     initialYear: number
     trigger?: React.ReactNode
+}
+
+interface CategorySlice {
+    name: string
+    value: number
+    color?: string
 }
 
 export function AllTransactionsModal({ initialMonth, initialYear, trigger }: AllTransactionsModalProps) {
@@ -77,7 +73,7 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
     const { categories } = useCategories()
 
     // Para o gráfico, buscamos dados resumidos ou uma amostra maior sem paginação (limite de 1000 para performance)
-    const [chartData, setChartData] = React.useState<any[]>([])
+    const [chartData, setChartData] = React.useState<CategorySlice[]>([])
     const { transactions: allTransactions } = useTransactions({
         month,
         year,
@@ -89,10 +85,10 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
 
     React.useEffect(() => {
         if (allTransactions) {
-            const summary = allTransactions.reduce((acc: any, t) => {
-                const name = (t as any).categoria?.nome || 'Geral'
+            const summary = allTransactions.reduce<Record<string, CategorySlice>>((acc, t) => {
+                const name = t.categoria?.nome || 'Geral'
                 if (!acc[name]) {
-                    acc[name] = { name, value: 0, color: (t as any).categoria?.cor }
+                    acc[name] = { name, value: 0, color: t.categoria?.cor }
                 }
                 acc[name].value += Number(t.valor)
                 return acc
@@ -120,9 +116,6 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
         }
     }
 
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-    }
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -175,7 +168,7 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
 
                         <div className="space-y-1.5">
                             <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Perfil</label>
-                            <Select value={type} onValueChange={(v: any) => { setType(v); setPage(1); }}>
+                            <Select value={type} onValueChange={(v) => { setType(v as typeof type); setPage(1); }}>
                                 <SelectTrigger className="h-9 md:h-10 bg-zinc-950/30 border-white/5 rounded-xl text-[10px] font-bold uppercase tracking-tight">
                                     <SelectValue placeholder="Tipo" />
                                 </SelectTrigger>
@@ -189,7 +182,7 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
 
                         <div className="space-y-1.5">
                             <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Natureza</label>
-                            <Select value={nature} onValueChange={(v: any) => { setNature(v); setPage(1); }}>
+                            <Select value={nature} onValueChange={(v) => { setNature(v as typeof nature); setPage(1); }}>
                                 <SelectTrigger className="h-9 md:h-10 bg-zinc-950/30 border-white/5 rounded-xl text-[10px] font-bold uppercase tracking-tight">
                                     <SelectValue placeholder="Natureza" />
                                 </SelectTrigger>
@@ -315,7 +308,7 @@ export function AllTransactionsModal({ initialMonth, initialYear, trigger }: All
                                                         <TableCell className="px-6 py-4">
                                                             <div className="flex flex-col">
                                                                 <span className="font-bold text-[12px] tracking-tight text-foreground group-hover:text-brand-1 transition-colors">{t.descricao}</span>
-                                                                <span className="text-[9px] text-muted-foreground/40 uppercase font-black tracking-widest">{(t as any).categoria?.nome || 'Geral'}</span>
+                                                                <span className="text-[9px] text-muted-foreground/40 uppercase font-black tracking-widest">{t.categoria?.nome || 'Geral'}</span>
                                                             </div>
                                                         </TableCell>
                                                         <TableCell className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-tighter">

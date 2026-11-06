@@ -34,7 +34,7 @@ import { useCofrinhoActions } from "../hooks/use-cofrinhos"
 import { Cofrinho } from "../services/cofrinhos"
 import { BankAccount, settingsService } from "@/features/settings/services/settings-service"
 import { todayISO } from "@/features/bank-accounts/services/balances"
-import { parseLocalDate } from "@/lib/utils"
+import { parseLocalDate, formatCurrency } from "@/lib/utils"
 
 const NO_ACCOUNT = "__none__"
 
@@ -127,7 +127,7 @@ export function TransactionModal({ open, onOpenChange, cofrinho, tipo, onSuccess
                         )}
                     </DialogTitle>
                     <DialogDescription>
-                        {cofrinho.nome} • Saldo atual: R$ {cofrinho.saldo_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        {cofrinho.nome} • Saldo atual: {formatCurrency(cofrinho.saldo_atual)}
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>

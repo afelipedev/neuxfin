@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { getErrorMessage } from '@/lib/utils'
+import { DEFAULT_CDI_ANUAL, normalizeCdi } from "@/features/cofrinhos/services/projection"
 
 const supabase = createClient()
 
@@ -15,7 +17,7 @@ export function ProfileSettings() {
     const [profile, setProfile] = React.useState({
         nome: "",
         email: "",
-        configurar_cdi: 13.15,
+        configurar_cdi: DEFAULT_CDI_ANUAL,
         avatar_url: ""
     })
     const [loading, setLoading] = React.useState(true)
@@ -27,7 +29,7 @@ export function ProfileSettings() {
         const fetchProfile = async () => {
             const { data: { user } } = await supabase.auth.getUser()
             if (user) {
-                const { data, error } = await supabase
+                const { data } = await supabase
                     .from('perfis')
                     .select('*')
                     .eq('id', user.id)
@@ -37,7 +39,7 @@ export function ProfileSettings() {
                     setProfile({
                         nome: data.nome || "",
                         email: data.email || user.email || "",
-                        configurar_cdi: data.configurar_cdi || 13.15,
+                        configurar_cdi: normalizeCdi(data.configurar_cdi),
                         avatar_url: data.avatar_url || ""
                     })
                 }
@@ -58,7 +60,7 @@ export function ProfileSettings() {
                 .from('perfis')
                 .update({
                     nome: profile.nome,
-                    configurar_cdi: profile.configurar_cdi,
+                    configurar_cdi: normalizeCdi(profile.configurar_cdi),
                     avatar_url: profile.avatar_url
                 })
                 .eq('id', user.id)
@@ -68,7 +70,7 @@ export function ProfileSettings() {
             toast.success("Perfil atualizado", {
                 description: "Suas alterações foram salvas com sucesso."
             })
-        } catch (error) {
+        } catch {
             toast.error("Erro ao salvar", {
                 description: "Não foi possível atualizar o perfil."
             })
@@ -128,10 +130,10 @@ export function ProfileSettings() {
             toast.success("Foto atualizada", {
                 description: "Sua foto de perfil foi atualizada com sucesso."
             })
-        } catch (error: any) {
+        } catch (error) {
             console.error('Avatar upload error:', error)
             toast.error("Erro no upload", {
-                description: error.message || "Não foi possível enviar a imagem."
+                description: getErrorMessage(error, "Não foi possível enviar a imagem.")
             })
         } finally {
             setUploading(false)
@@ -214,19 +216,21 @@ export function ProfileSettings() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="cdi">Taxa CDI Base (%)</Label>
+                                    <Label htmlFor="cdi">Taxa CDI anual (%)</Label>
                                     <div className="relative">
                                         <Percent className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                                         <Input
                                             id="cdi"
                                             type="number"
                                             step="0.01"
+                                            min="0"
+                                            max="100"
                                             className="pl-10"
                                             value={profile.configurar_cdi}
                                             onChange={(e) => setProfile({ ...profile, configurar_cdi: parseFloat(e.target.value) })}
                                         />
                                     </div>
-                                    <p className="text-[10px] text-muted-foreground">Usada para calcular rendimentos nos cofrinhos.</p>
+                                    <p className="text-[10px] text-muted-foreground">Usada na previsão de rendimento dos cofrinhos (100% do CDI, ao ano).</p>
                                 </div>
                             </div>
                         </div>

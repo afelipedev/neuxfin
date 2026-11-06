@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { PiggyBank, Target, Type, Palette, Calendar as CalendarIcon } from "lucide-react"
+import { PiggyBank, Target, Calendar as CalendarIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,

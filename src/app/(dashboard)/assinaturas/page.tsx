@@ -18,14 +18,7 @@ import { SubscriptionFormModal } from "@/features/subscriptions/components/subsc
 import { DeleteSubscriptionDialog } from "@/features/subscriptions/components/delete-subscription-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Subscription } from "@/features/subscriptions/services/subscriptions"
-
-// Função para formatar valor em reais
-function formatCurrency(value: number): string {
-    return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-    }).format(value)
-}
+import { formatCurrency } from "@/lib/utils"
 
 // Mapeamento de cores para ícones
 const iconColors: Record<string, string> = {
@@ -37,15 +30,6 @@ const iconColors: Record<string, string> = {
     rosa: 'bg-pink-500/10 text-pink-600',
     laranja: 'bg-orange-500/10 text-orange-600',
     default: 'bg-indigo-500/10 text-indigo-600',
-}
-
-// Mapeamento de bandeiras de cartão
-const bandeiraBadgeColors: Record<string, string> = {
-    visa: 'bg-blue-500/20 text-blue-600',
-    mastercard: 'bg-red-500/20 text-red-600',
-    elo: 'bg-yellow-500/20 text-yellow-600',
-    amex: 'bg-cyan-500/20 text-cyan-600',
-    default: 'bg-gray-500/20 text-gray-600',
 }
 
 // Mapeamento de status

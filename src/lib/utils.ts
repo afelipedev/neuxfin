@@ -39,11 +39,27 @@ export function formatDateToISO(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
-const brlFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+const brlFormatters = new Map<number, Intl.NumberFormat>()
 
-/** Formata um valor numérico em Reais (R$). */
-export function formatCurrency(value: number): string {
-  return brlFormatter.format(value)
+/**
+ * Formata um valor em Reais (R$ 1.234,56). Fonte única de formatação de moeda:
+ * não crie `Intl.NumberFormat` local nos componentes.
+ * `fractionDigits: 0` para eixos e rótulos compactos de gráficos.
+ */
+export function formatCurrency(value: number | string | null | undefined, options: { fractionDigits?: number } = {}): string {
+  const digits = options.fractionDigits ?? 2
+  let formatter = brlFormatters.get(digits)
+  if (!formatter) {
+    formatter = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    })
+    brlFormatters.set(digits, formatter)
+  }
+  const n = Number(value ?? 0)
+  return formatter.format(Number.isFinite(n) ? n : 0)
 }
 
 /**
@@ -53,4 +69,32 @@ export function formatCurrency(value: number): string {
 export function dateInMonthClamped(year: number, monthIndex: number, day: number): Date {
   const lastDay = new Date(year, monthIndex + 1, 0).getDate()
   return new Date(year, monthIndex, Math.min(day, lastDay))
+}
+
+/**
+ * Mensagem legível de um erro desconhecido (Error, PostgrestError ou string).
+ * Use em `catch (error)` no lugar de `catch (error: any)`.
+ */
+export function getErrorMessage(error: unknown, fallback = 'Erro desconhecido'): string {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === 'string' && error) return error
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string' && message) return message
+  }
+  return fallback
+}
+
+/** Normaliza um erro desconhecido para `Error` (útil para estados `Error | null`). */
+export function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(getErrorMessage(error))
+}
+
+/** Código do Postgres/PostgREST de um erro (ex.: '23503' para FK/trigger de bloqueio). */
+export function getErrorCode(error: unknown): string | undefined {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code
+    return typeof code === 'string' ? code : undefined
+  }
+  return undefined
 }

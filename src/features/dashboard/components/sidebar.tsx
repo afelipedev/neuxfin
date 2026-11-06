@@ -12,9 +12,7 @@ import {
     Wallet,
     PieChart,
     Settings,
-    Calculator,
-    MessageSquare,
-    LogOut
+    LogOut,
 } from "lucide-react"
 
 import {

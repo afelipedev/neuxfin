@@ -2,7 +2,7 @@
 
 import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
 import * as React from "react"
-import { Plus, CreditCard, Trash2, Edit, Calendar } from "lucide-react"
+import { Plus, Trash2, Edit, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -14,13 +14,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -42,6 +36,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { settingsService, CreditCard as ICreditCard } from "../services/settings-service"
 import { toast } from "sonner"
+import { formatCurrency } from "@/lib/utils"
 
 export function CardsSettings() {
     const [cards, setCards] = React.useState<ICreditCard[]>([])
@@ -94,7 +89,7 @@ export function CardsSettings() {
             setEditingCard(null)
             setFormData({ nome: "", bandeira: "Visa", limite: 0, dia_vencimento: 10, dia_fechamento: 3, cor: "#6366f1" })
             fetchCards()
-        } catch (error) {
+        } catch {
             toast.error(editingCard ? "Erro ao atualizar cartão" : "Erro ao cadastrar cartão", {
                 description: "Ocorreu um erro ao processar sua solicitação."
             })
@@ -302,7 +297,7 @@ export function CardsSettings() {
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right font-mono font-bold">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.limite)}
+                                            {formatCurrency(card.limite)}
                                         </TableCell>
                                         <TableCell className="text-right px-6">
                                             <div className="flex justify-end gap-1">

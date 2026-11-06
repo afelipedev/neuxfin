@@ -20,6 +20,7 @@ import {
 } from '../services/transactions'
 import { toast } from 'sonner'
 import { useTransactionContextOptional } from '../context/transaction-context'
+import { getErrorMessage, toError } from '@/lib/utils'
 
 export function useTransactions(filters: TransactionFilters = {}) {
     const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -31,31 +32,25 @@ export function useTransactions(filters: TransactionFilters = {}) {
     const transactionContext = useTransactionContextOptional()
     const globalUpdateCounter = transactionContext?.updateCounter ?? 0
 
+    // Campos primitivos como dependências: recarrega só quando um filtro muda de valor
+    const { month, year, tipo, tipo_transacao, status, categoria_id, page, pageSize, sortBy, sortOrder } = filters
+
     const loadTransactions = useCallback(async () => {
         try {
             setLoading(true)
-            const result = await getTransactions(filters)
+            const result = await getTransactions({
+                month, year, tipo, tipo_transacao, status, categoria_id, page, pageSize, sortBy, sortOrder,
+            })
             setTransactions(result.data || [])
             setTotalCount(result.count || 0)
             setError(null)
-        } catch (e: any) {
-            setError(e)
+        } catch (e) {
+            setError(toError(e))
             toast.error('Erro ao carregar transações')
         } finally {
             setLoading(false)
         }
-    }, [
-        filters.month,
-        filters.year,
-        filters.tipo,
-        filters.tipo_transacao,
-        filters.status,
-        filters.categoria_id,
-        filters.page,
-        filters.pageSize,
-        filters.sortBy,
-        filters.sortOrder
-    ])
+    }, [month, year, tipo, tipo_transacao, status, categoria_id, page, pageSize, sortBy, sortOrder])
 
     // Recarregar quando os filtros ou o contador global mudarem
     useEffect(() => {
@@ -82,11 +77,13 @@ export function useTransactionStats(filters: TransactionFilters = {}) {
     const transactionContext = useTransactionContextOptional()
     const globalUpdateCounter = transactionContext?.updateCounter ?? 0
 
+    const { month, year, tipo, tipo_transacao } = filters
+
     useEffect(() => {
         async function loadStats() {
             try {
                 setLoading(true)
-                const data = await getTransactionStats(filters)
+                const data = await getTransactionStats({ month, year, tipo, tipo_transacao })
                 setStats(data)
             } catch (e) {
                 console.error(e)
@@ -97,7 +94,7 @@ export function useTransactionStats(filters: TransactionFilters = {}) {
         }
 
         loadStats()
-    }, [filters.month, filters.year, filters.tipo, filters.tipo_transacao, globalUpdateCounter])
+    }, [month, year, tipo, tipo_transacao, globalUpdateCounter])
 
     return { stats, loading }
 }
@@ -110,11 +107,13 @@ export function useDashboardStats(filters: { month?: number, year?: number } = {
     const transactionContext = useTransactionContextOptional()
     const globalUpdateCounter = transactionContext?.updateCounter ?? 0
 
+    const { month, year } = filters
+
     useEffect(() => {
         async function loadStats() {
             try {
                 setLoading(true)
-                const data = await getDashboardStats(filters)
+                const data = await getDashboardStats({ month, year })
                 setStats(data)
             } catch (e) {
                 console.error(e)
@@ -125,7 +124,7 @@ export function useDashboardStats(filters: { month?: number, year?: number } = {
         }
 
         loadStats()
-    }, [filters.month, filters.year, globalUpdateCounter])
+    }, [month, year, globalUpdateCounter])
 
     return { stats, loading }
 }
@@ -184,12 +183,13 @@ export function useTransactionActions() {
             // Notificar todas as telas sobre a mudança
             notifyChange?.()
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error('Erro detalhado ao criar transação:', JSON.stringify(e, null, 2))
-            console.error('Mensagem de erro:', e.message)
-            console.error('Detalhes do erro:', e.details)
-            console.error('Hint do erro:', e.hint)
-            toast.error(`Erro ao criar transação: ${e.message || 'Erro desconhecido'}`)
+            const detail = e as { details?: string; hint?: string }
+            console.error('Mensagem de erro:', getErrorMessage(e))
+            console.error('Detalhes do erro:', detail?.details)
+            console.error('Hint do erro:', detail?.hint)
+            toast.error(`Erro ao criar transação: ${getErrorMessage(e)}`)
             return false
         } finally {
             setLoading(false)
@@ -204,7 +204,7 @@ export function useTransactionActions() {
             // Notificar todas as telas sobre a mudança
             notifyChange?.()
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error(e)
             toast.error('Erro ao atualizar transação')
             return false
@@ -228,7 +228,7 @@ export function useTransactionActions() {
             // Notificar todas as telas sobre a mudança
             notifyChange?.()
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error(e)
             toast.error('Erro ao excluir transação')
             return false
@@ -257,7 +257,7 @@ export function useTransactionActions() {
             // Notificar todas as telas sobre a mudança
             notifyChange?.()
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error(e)
             toast.error('Erro ao atualizar status')
             return false
@@ -277,7 +277,7 @@ export function useTransactionActions() {
             // Notificar todas as telas sobre a mudança
             notifyChange?.()
             return true
-        } catch (e: any) {
+        } catch (e) {
             console.error(e)
             toast.error('Erro ao replicar transações')
             return false

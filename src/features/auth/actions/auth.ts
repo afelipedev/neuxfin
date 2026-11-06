@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 
 export async function login(formData: FormData) {
     const supabase = await createClient()
@@ -20,7 +19,6 @@ export async function login(formData: FormData) {
         return { error: error.message }
     }
 
-    const origin = (await headers()).get('origin')
     // revalidatePath('/', 'layout') // Optional: clear cache
     redirect('/')
 }

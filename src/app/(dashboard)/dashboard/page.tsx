@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Plus, Download, Calendar, Search, ChevronRight, ArrowUpCircle, ArrowDownCircle } from "lucide-react"
+import { Plus, Download, ChevronRight, ArrowUpCircle, ArrowDownCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     SummaryCards,
@@ -22,7 +22,6 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { CashFlowChart } from "@/features/dashboard/components/cash-flow-chart"
 import { useTransactions, useDashboardStats, useCashFlowData } from "@/features/transactions/hooks/use-transactions"
 import { TransactionForm } from "@/features/transactions/components/transaction-form"
@@ -31,7 +30,7 @@ import { BankAccountsBalance } from "@/features/bank-accounts/components/bank-ac
 import { DataTablePagination } from "@/components/data-table-pagination"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { cn, parseLocalDate } from "@/lib/utils"
+import { cn, parseLocalDate, formatCurrency } from "@/lib/utils"
 
 export default function DashboardPage() {
     const [month, setMonth] = React.useState(new Date().getMonth() + 1)
@@ -56,7 +55,7 @@ export default function DashboardPage() {
         page,
         pageSize
     }), [month, year, page, pageSize])
-    const { transactions, totalCount, loading: loadingTransactions, error } = useTransactions(filters)
+    const { transactions, totalCount, loading: loadingTransactions } = useTransactions(filters)
     const { stats, loading: loadingStats } = useDashboardStats(filters)
     const { data: cashFlowData, loading: loadingCashFlow } = useCashFlowData(12, true)
 
@@ -84,9 +83,6 @@ export default function DashboardPage() {
         }
     }
 
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-    }
 
 
     return (
@@ -211,11 +207,11 @@ export default function DashboardPage() {
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-[13px] tracking-tight text-foreground group-hover:text-brand-1 transition-colors">{t.descricao}</span>
-                                                <span className="text-[10px] text-muted-foreground/50 uppercase font-black tracking-widest italic tracking-tighter">{(t as any).categoria?.nome || 'Geral'}</span>
+                                                <span className="text-[10px] text-muted-foreground/50 uppercase font-black tracking-widest italic tracking-tighter">{t.categoria?.nome || 'Geral'}</span>
                                             </div>
                                         </TableCell>
                                         <TableCell className="hidden sm:table-cell"><span className="bg-secondary text-muted-foreground border border-border px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter">{t.tipo_transacao}</span></TableCell>
-                                        <TableCell className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-tighter font-body hidden md:table-cell">{(t as any).categoria?.nome || '-'}</TableCell>
+                                        <TableCell className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-tighter font-body hidden md:table-cell">{t.categoria?.nome || '-'}</TableCell>
                                         <TableCell className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-tighter font-body">
                                             {format(parseLocalDate(t.data_vencimento), 'dd MMM yyyy', { locale: ptBR }).toUpperCase()}
                                         </TableCell>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calculator, X, TrendingUp, TrendingDown, Wallet, CheckCircle2, Clock, Search, Filter, ChevronDown } from "lucide-react"
+import { Calculator, TrendingUp, TrendingDown, Wallet, CheckCircle2, Search, Filter } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -19,9 +19,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { cn, parseLocalDate } from "@/lib/utils"
+import { cn, parseLocalDate, formatCurrency } from "@/lib/utils"
 import { useTransactions, useDashboardStats } from "@/features/transactions/hooks/use-transactions"
-import { Transaction } from "@/features/transactions/services/transactions"
 
 interface CalculatorProps {
     isOpen: boolean
@@ -43,13 +42,13 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
 
     // Dados do mês atual
-    const { stats, loading: statsLoading } = useDashboardStats({
+    const { stats } = useDashboardStats({
         month: currentDate.getMonth() + 1,
         year: currentDate.getFullYear()
     })
 
     // Transações do seletor (filtrar no backend para não "sumir" itens por paginação)
-    const { transactions, loading: transactionsLoading } = useTransactions({
+    const { transactions } = useTransactions({
         month: filterMonth,
         year: filterYear,
         tipo_transacao: filterType,
@@ -184,12 +183,6 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
         setSelectedItems(newSet)
     }
 
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL'
-        }).format(value)
-    }
 
     const formatDate = (dateString: string) => {
         const date = parseLocalDate(dateString)
@@ -477,7 +470,7 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                     </SelectContent>
                                 </Select>
 
-                                <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
+                                <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
                                     <SelectTrigger className="h-12 rounded-xl border-border bg-secondary/50">
                                         <SelectValue placeholder="Todos status" />
                                     </SelectTrigger>

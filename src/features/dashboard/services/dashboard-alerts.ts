@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { formatDateToISO, parseLocalDate } from '@/lib/utils'
+import { formatCurrency, formatDateToISO, parseLocalDate } from '@/lib/utils'
 import { fromCents, toCents, todayISO } from '@/features/bank-accounts/services/balances'
 import { type CardOverview, fetchCardsOverview } from '@/features/credit-cards/services/invoices'
 
@@ -46,7 +46,6 @@ const addDays = (iso: string, days: number) => {
     return formatDateToISO(d)
 }
 
-const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 interface OpenTxRow {
     id: string
@@ -103,7 +102,7 @@ export function buildAlerts(input: {
             id: 'atrasados',
             level: 'critico',
             titulo: `${atrasados.length} conta(s) em atraso`,
-            descricao: `${brl(total)} vencido(s) e não pago(s). Regularize para evitar juros.`,
+            descricao: `${formatCurrency(total)} vencido(s) e não pago(s). Regularize para evitar juros.`,
             href: '/despesas'
         })
     }
@@ -113,7 +112,7 @@ export function buildAlerts(input: {
             id: 'saldo-previsto-negativo',
             level: 'critico',
             titulo: 'Saldo previsto negativo',
-            descricao: `Com o que falta pagar e receber, o mês fecha em ${brl(input.saldoPrevistoFimMes)}.`
+            descricao: `Com o que falta pagar e receber, o mês fecha em ${formatCurrency(input.saldoPrevistoFimMes)}.`
         })
     }
 
@@ -126,7 +125,7 @@ export function buildAlerts(input: {
                 id: `limite:${card.id}`,
                 level: uso >= 1 ? 'critico' : 'atencao',
                 titulo: `Limite do ${card.nome} em ${Math.round(uso * 100)}%`,
-                descricao: `Disponível: ${brl(card.disponivel)} de ${brl(limite)}.`,
+                descricao: `Disponível: ${formatCurrency(card.disponivel)} de ${formatCurrency(limite)}.`,
                 href: `/cartoes/${card.id}`
             })
         }

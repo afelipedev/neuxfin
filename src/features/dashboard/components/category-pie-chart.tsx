@@ -1,7 +1,7 @@
 "use client"
 
 import { Pie, PieChart, ResponsiveContainer, Cell, Tooltip, Legend } from "recharts"
-import { cn } from "@/lib/utils"
+import { cn, formatCurrency } from "@/lib/utils"
 
 interface CategoryData {
     name: string
@@ -17,7 +17,13 @@ interface CategoryPieChartProps {
 
 const DEFAULT_COLORS = ["#26c8a6", "#45d6bc", "#64e4d3", "#83f1e9", "#a2ffff", "#fb7185", "#f43f5e", "#e11d48"]
 
-function ScrollableLegend({ payload }: { payload?: any[] }) {
+/** Itens que o Recharts injeta no `content` da Legend (subconjunto usado aqui). */
+interface LegendItem {
+    value?: string | number
+    color?: string
+}
+
+function ScrollableLegend({ payload }: { payload?: readonly LegendItem[] }) {
     if (!payload || payload.length === 0) return null
 
     return (
@@ -83,7 +89,7 @@ export function CategoryPieChart({ data = [], className, height = 300 }: Categor
                         }}
                         itemStyle={{ color: '#fff', fontWeight: 'bold' }}
                         formatter={(value: number | undefined) => [
-                            new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value ?? 0),
+                            formatCurrency(value),
                             ''
                         ]}
                     />

@@ -38,7 +38,6 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 import { cn, formatDateToISO, parseLocalDate } from "@/lib/utils"
 import { useTransactionActions } from "../hooks/use-transactions"
 import { createClient } from "@/lib/supabase/client"

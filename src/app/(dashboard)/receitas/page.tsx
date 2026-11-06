@@ -1,8 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Filter, Calendar, ArrowUpRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Calendar, ArrowUpRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
     Table,
@@ -31,7 +30,7 @@ import { deriveStatus } from "@/features/bank-accounts/services/balances"
 import { ExportTransactionsButton } from "@/features/transactions/components/export-transactions-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DataTablePagination } from "@/components/data-table-pagination"
-import { cn, parseLocalDate } from "@/lib/utils"
+import { parseLocalDate, formatCurrency } from "@/lib/utils"
 
 export default function ReceitasPage() {
     const currentDate = new Date()
@@ -74,12 +73,6 @@ export default function ReceitasPage() {
         year: 'numeric'
     })
 
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL'
-        }).format(value)
-    }
 
     const formatDate = (dateString: string) => {
         return parseLocalDate(dateString).toLocaleDateString('pt-BR')
@@ -223,7 +216,7 @@ export default function ReceitasPage() {
                 <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-neux-1/5 px-6 py-4">
                     <div className="flex items-center gap-4 flex-wrap w-full">
                         <div className="flex items-center gap-2">
-                            <Select value={tipoFilter} onValueChange={(value: any) => { setTipoFilter(value); setCurrentPage(1); }}>
+                            <Select value={tipoFilter} onValueChange={(value) => { setTipoFilter(value as typeof tipoFilter); setCurrentPage(1); }}>
                                 <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs border-none bg-zinc-900/5 dark:bg-zinc-100/10">
                                     <SelectValue placeholder="Tipo (PF/PJ)" />
                                 </SelectTrigger>
@@ -234,7 +227,7 @@ export default function ReceitasPage() {
                                 </SelectContent>
                             </Select>
 
-                            <Select value={statusFilter} onValueChange={(value: any) => { setStatusFilter(value); setCurrentPage(1); }}>
+                            <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value as typeof statusFilter); setCurrentPage(1); }}>
                                 <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs border-none bg-zinc-900/5 dark:bg-zinc-100/10">
                                     <SelectValue placeholder="Status" />
                                 </SelectTrigger>

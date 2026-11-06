@@ -12,7 +12,14 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Catálogo de skills de terceiros (não é código do app)
+    ".agent/**",
   ]),
+  {
+    // Componentes gerados pelo shadcn/ui: não editar à mão (ex.: Math.random no skeleton do sidebar)
+    files: ["src/components/ui/**"],
+    rules: { "react-hooks/purity": "off" },
+  },
 ]);
 
 export default eslintConfig;

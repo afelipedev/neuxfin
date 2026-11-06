@@ -1,6 +1,7 @@
 "use client"
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Rectangle } from "recharts"
+import { formatCurrency } from "@/lib/utils"
 
 interface CashFlowData {
     name: string
@@ -13,23 +14,21 @@ interface CashFlowChartProps {
     loading?: boolean
 }
 
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(value)
+/** Props que o Recharts injeta no `content` do Tooltip (subconjunto usado aqui). */
+interface CashFlowTooltipProps {
+    active?: boolean
+    label?: string | number
+    payload?: Array<{ name?: string | number; value?: number | string; color?: string }>
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: CashFlowTooltipProps) => {
     if (active && payload && payload.length) {
         return (
             <div className="bg-zinc-900 dark:bg-zinc-950 border border-white/10 rounded-xl p-3 shadow-xl">
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">
                     {label}
                 </p>
-                {payload.map((entry: any, index: number) => (
+                {payload.map((entry, index) => (
                     <div key={index} className="flex items-center gap-2">
                         <div
                             className="h-2 w-2 rounded-full"
@@ -40,7 +39,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                         </span>
                         <span className={`text-[11px] font-black tracking-tight ${entry.name === 'receitas' ? 'text-brand-1' : 'text-rose-500'
                             }`}>
-                            {formatCurrency(entry.value)}
+                            {formatCurrency(entry.value, { fractionDigits: 0 })}
                         </span>
                     </div>
                 ))}
