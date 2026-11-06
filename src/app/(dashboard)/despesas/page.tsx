@@ -1,5 +1,6 @@
 "use client"
 
+import { RecurrenceBadge } from "@/features/transactions/components/recurrence-badge"
 import { useState } from "react"
 import Link from "next/link"
 import {
@@ -349,6 +350,7 @@ export default function DespesasPage() {
                                                     ({transaction.parcela_atual}/{transaction.total_parcelas})
                                                 </span>
                                             )}
+                                            <RecurrenceBadge transaction={transaction} />
                                             {transaction.cartao_id && (
                                                 <Link
                                                     href={`/cartoes/${transaction.cartao_id}`}

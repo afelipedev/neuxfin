@@ -11,6 +11,18 @@ import {
     Subscription,
     SubscriptionStats
 } from '../services/subscriptions'
+import { useTransactionContextOptional } from '@/features/transactions/context/transaction-context'
+
+/** Lança a despesa do mês atual logo após criar/editar (idempotente). */
+async function syncCurrentMonth(): Promise<number> {
+    const now = new Date()
+    try {
+        return await generateExpensesFromSubscriptions(now.getMonth() + 1, now.getFullYear())
+    } catch (e) {
+        console.error('Erro ao lançar despesas das assinaturas:', e)
+        return 0
+    }
+}
 
 /**
  * Hook para gerenciar lista de assinaturas
@@ -82,14 +94,19 @@ export function useSubscriptionStats() {
  */
 export function useSubscriptionActions() {
     const [loading, setLoading] = useState(false)
+    const notify = useTransactionContextOptional()?.notifyTransactionChange
 
     const create = useCallback(async (
-        subscription: Omit<Subscription, 'id' | 'usuario_id' | 'created_at' | 'categoria' | 'cartao'>
+        subscription: Omit<Subscription, 'id' | 'usuario_id' | 'created_at' | 'categoria' | 'cartao' | 'conta'>
     ) => {
         try {
             setLoading(true)
             await createSubscription(subscription)
-            toast.success('Assinatura criada com sucesso!')
+            const lancadas = await syncCurrentMonth()
+            toast.success('Assinatura criada com sucesso!', {
+                description: lancadas > 0 ? 'A despesa deste mês já foi lançada.' : undefined,
+            })
+            if (lancadas > 0) notify?.()
             return true
         } catch (e) {
             console.error('Erro ao criar assinatura:', e)
@@ -98,25 +115,26 @@ export function useSubscriptionActions() {
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [notify])
 
     const update = useCallback(async (
         id: string,
-        updates: Partial<Omit<Subscription, 'id' | 'usuario_id' | 'created_at' | 'categoria' | 'cartao'>>
+        updates: Partial<Omit<Subscription, 'id' | 'usuario_id' | 'created_at' | 'categoria' | 'cartao' | 'conta'>>
     ) => {
         try {
             setLoading(true)
             await updateSubscription(id, updates)
+            if ((await syncCurrentMonth()) > 0) notify?.()
             toast.success('Assinatura atualizada com sucesso!')
             return true
         } catch (e) {
             console.error('Erro ao atualizar assinatura:', e)
-            toast.error('Erro ao atualizar assinatura')
+            toast.error(`Erro ao atualizar assinatura: ${getErrorMessage(e)}`)
             return false
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [notify])
 
     const remove = useCallback(async (id: string) => {
         try {
@@ -138,6 +156,7 @@ export function useSubscriptionActions() {
             setLoading(true)
             const count = await generateExpensesFromSubscriptions(month, year)
             if (count > 0) {
+                notify?.()
                 toast.success(`${count} despesas geradas a partir das assinaturas!`)
             } else {
                 toast.info('Todas as despesas de assinaturas já foram geradas para este mês.')
@@ -150,7 +169,7 @@ export function useSubscriptionActions() {
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [notify])
 
     return {
         create,

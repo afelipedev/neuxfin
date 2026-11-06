@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import { createTransaction } from '@/features/transactions/services/transactions'
-import { formatDateToISO } from '@/lib/utils'
+import { monthlyCost, subscriptionOccurrences } from './schedule'
 
 export interface Subscription {
     id: string
@@ -10,6 +9,10 @@ export interface Subscription {
     data_vencimento_dia: number | null
     categoria_id: string | null
     cartao_id: string | null
+    /** Conta debitada quando não é cobrada no cartão (vazia = conta padrão do usuário) */
+    conta_id: string | null
+    /** Primeira cobrança possível; âncora de anual/trimestral/semanal */
+    data_inicio: string
     status: 'ativo' | 'pausado' | 'cancelado'
     descricao: string | null
     frequencia: 'mensal' | 'anual' | 'semanal' | 'trimestral'
@@ -29,6 +32,10 @@ export interface Subscription {
         bandeira?: string
         cor?: string
     }
+    conta?: {
+        id: string
+        nome: string
+    } | null
 }
 
 export interface SubscriptionStats {
@@ -49,7 +56,8 @@ export async function getSubscriptions(): Promise<Subscription[]> {
         .select(`
             *,
             categoria:categorias(*),
-            cartao:cartoes_credito(*)
+            cartao:cartoes_credito(*),
+            conta:contas_bancarias(id, nome)
         `)
         .order('nome')
 
@@ -66,7 +74,8 @@ export async function getSubscriptionById(id: string): Promise<Subscription | nu
         .select(`
             *,
             categoria:categorias(*),
-            cartao:cartoes_credito(*)
+            cartao:cartoes_credito(*),
+            conta:contas_bancarias(id, nome)
         `)
         .eq('id', id)
         .single()
@@ -93,19 +102,10 @@ export async function getSubscriptionStats(): Promise<SubscriptionStats> {
     };
 
     ((data ?? []) as Array<Pick<Subscription, 'valor' | 'status' | 'frequencia'>>).forEach((sub) => {
-        // Calcular custo mensal baseado na frequência
-        let valorMensal = Number(sub.valor)
-
-        if (sub.frequencia === 'anual') {
-            valorMensal = valorMensal / 12
-        } else if (sub.frequencia === 'trimestral') {
-            valorMensal = valorMensal / 3
-        } else if (sub.frequencia === 'semanal') {
-            valorMensal = valorMensal * 4
-        }
+        const valorMensal = monthlyCost(sub.valor, sub.frequencia)
 
         if (sub.status === 'ativo') {
-            stats.custoMensal += valorMensal
+            stats.custoMensal = Math.round((stats.custoMensal + valorMensal) * 100) / 100
             stats.totalAtivas++
         } else if (sub.status === 'pausado') {
             stats.totalPausadas++
@@ -121,7 +121,7 @@ export async function getSubscriptionStats(): Promise<SubscriptionStats> {
  * Cria uma nova assinatura
  */
 export async function createSubscription(
-    subscription: Omit<Subscription, 'id' | 'usuario_id' | 'created_at' | 'categoria' | 'cartao'>
+    subscription: Omit<Subscription, 'id' | 'usuario_id' | 'created_at' | 'categoria' | 'cartao' | 'conta'>
 ): Promise<Subscription> {
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -135,7 +135,8 @@ export async function createSubscription(
         .select(`
             *,
             categoria:categorias(*),
-            cartao:cartoes_credito(*)
+            cartao:cartoes_credito(*),
+            conta:contas_bancarias(id, nome)
         `)
         .single()
 
@@ -148,7 +149,7 @@ export async function createSubscription(
  */
 export async function updateSubscription(
     id: string,
-    updates: Partial<Omit<Subscription, 'id' | 'usuario_id' | 'created_at' | 'categoria' | 'cartao'>>
+    updates: Partial<Omit<Subscription, 'id' | 'usuario_id' | 'created_at' | 'categoria' | 'cartao' | 'conta'>>
 ): Promise<Subscription> {
     const { data, error } = await supabase
         .from('assinaturas')
@@ -157,7 +158,8 @@ export async function updateSubscription(
         .select(`
             *,
             categoria:categorias(*),
-            cartao:cartoes_credito(*)
+            cartao:cartoes_credito(*),
+            conta:contas_bancarias(id, nome)
         `)
         .single()
 
@@ -178,80 +180,60 @@ export async function deleteSubscription(id: string): Promise<void> {
 }
 
 /**
- * Gera despesas para as assinaturas ativas do mês
- * Esta função deve ser chamada mensalmente ou quando o usuário acessar as despesas
+ * Lança as despesas das assinaturas ativas que vencem no mês, conforme a frequência.
+ * Idempotente: o índice único (assinatura_id, data_vencimento) ignora as já lançadas,
+ * então pode rodar automaticamente a cada acesso.
+ * Conta: cartão da assinatura → conta da assinatura → conta padrão → sem conta.
+ * Retorna quantas despesas foram criadas.
  */
 export async function generateExpensesFromSubscriptions(
     month: number,
     year: number
 ): Promise<number> {
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Usuário não autenticado')
 
-    if (!user) {
-        throw new Error('Usuário não autenticado')
-    }
+    const [subsRes, contaRes] = await Promise.all([
+        supabase
+            .from('assinaturas')
+            .select('id, nome, valor, frequencia, data_vencimento_dia, data_inicio, categoria_id, cartao_id, conta_id')
+            .eq('status', 'ativo'),
+        supabase
+            .from('contas_bancarias')
+            .select('id')
+            .eq('padrao', true)
+            .maybeSingle(),
+    ])
+    if (subsRes.error) throw subsRes.error
+    if (contaRes.error) throw contaRes.error
+    const contaPadrao = contaRes.data?.id ?? null
 
-    // Buscar assinaturas ativas
-    const { data: subscriptions, error: subError } = await supabase
-        .from('assinaturas')
-        .select('*')
-        .eq('status', 'ativo')
-
-    if (subError) throw subError
-
-    // Verificar quais assinaturas já têm despesas geradas para o mês
-    const startDate = formatDateToISO(new Date(year, month - 1, 1))
-    const endDate = formatDateToISO(new Date(year, month, 0))
-
-    const { data: existingExpenses, error: expError } = await supabase
-        .from('transacoes')
-        .select('descricao')
-        .eq('tipo_transacao', 'despesa')
-        .eq('is_recorrente', true)
-        .gte('data_vencimento', startDate)
-        .lte('data_vencimento', endDate)
-        .ilike('descricao', '%[Assinatura]%')
-
-    if (expError) throw expError
-
-    const existingDescriptions = new Set(
-        existingExpenses?.map(e => e.descricao) || []
+    type SubRow = Pick<Subscription, 'id' | 'nome' | 'valor' | 'frequencia' | 'data_vencimento_dia' | 'data_inicio' | 'categoria_id' | 'cartao_id' | 'conta_id'>
+    const rows = ((subsRes.data ?? []) as SubRow[]).flatMap(sub =>
+        subscriptionOccurrences(sub, year, month).map(data_vencimento => ({
+            usuario_id: user.id,
+            assinatura_id: sub.id,
+            descricao: `[Assinatura] ${sub.nome}`,
+            valor: Number(sub.valor),
+            tipo: 'PF' as const,
+            tipo_transacao: 'despesa' as const,
+            categoria_id: sub.categoria_id ?? null,
+            cartao_id: sub.cartao_id ?? null,
+            // No cartão a despesa entra na fatura; fora dele, debita uma conta
+            conta_id: sub.cartao_id ? null : (sub.conta_id ?? contaPadrao),
+            data_vencimento,
+            data_pagamento: null,
+            status: 'pendente' as const,
+            is_recorrente: true,
+        }))
     )
+    if (rows.length === 0) return 0
 
-    let createdCount = 0
+    const { data, error } = await supabase
+        .from('transacoes')
+        .upsert(rows, { onConflict: 'assinatura_id,data_vencimento', ignoreDuplicates: true })
+        .select('id')
 
-    for (const sub of subscriptions || []) {
-        const description = `[Assinatura] ${sub.nome}`
-
-        // Pular se já existe despesa para esta assinatura neste mês
-        if (existingDescriptions.has(description)) continue
-
-        // Calcular data de vencimento
-        const diaVencimento = sub.data_vencimento_dia || 1
-        const dataVencimento = new Date(year, month - 1, diaVencimento)
-
-        // Criar a despesa
-        try {
-            await createTransaction({
-                descricao: description,
-                valor: Number(sub.valor),
-                tipo: 'PF',
-                tipo_transacao: 'despesa',
-                categoria_id: sub.categoria_id || '',
-                conta_id: null,
-                cartao_id: sub.cartao_id,
-                data_vencimento: formatDateToISO(dataVencimento),
-                data_pagamento: null,
-                status: 'pendente',
-                is_recorrente: true,
-                parcela_atual: null,
-                total_parcelas: null
-            })
-            createdCount++
-        } catch (e) {
-            console.error(`Erro ao criar despesa para assinatura ${sub.nome}:`, e)
-        }
-    }
-
-    return createdCount
+    if (error) throw error
+    return data?.length ?? 0
 }

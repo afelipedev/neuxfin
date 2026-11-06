@@ -54,7 +54,9 @@ const formSchema = z.object({
     // Opcionais: o campo da forma de pagamento não escolhida sai da tela e pode ficar undefined
     conta_id: z.string().optional(),
     cartao_id: z.string().optional(),
-    recorrencia: z.string().optional(),
+    // Repetir todo mês por N meses (série recorrente); não combina com parcelamento
+    is_recorrente: z.boolean(),
+    meses_recorrencia: z.number().int().min(2).max(60).optional(),
     data: z.date({ error: "Selecione a data" }),
     status: z.enum(["liquidado", "pendente"]),
     tipo_despesa: z.enum(["fixa", "variavel"]).optional(),
@@ -82,6 +84,7 @@ const FIELD_LABELS: Record<string, string> = {
     data: "Data",
     status: "Status",
     total_parcelas: "Parcelas",
+    meses_recorrencia: "Meses de recorrência",
 }
 
 interface Category {
@@ -119,6 +122,8 @@ const emptyValues = (type: "receita" | "despesa"): FormValues => ({
     data: new Date(),
     is_parcelado: false,
     total_parcelas: 2,
+    is_recorrente: false,
+    meses_recorrencia: 12,
 })
 
 export function TransactionForm({ type, onSuccess, trigger, open: openProp, onOpenChange }: TransactionFormProps) {
@@ -141,6 +146,7 @@ export function TransactionForm({ type, onSuccess, trigger, open: openProp, onOp
     })
 
     const isParcelado = form.watch("is_parcelado")
+    const isRecorrente = form.watch("is_recorrente")
     const formaPagamento = form.watch("forma_pagamento")
     const cartaoId = form.watch("cartao_id")
     const dataCompra = form.watch("data")
@@ -195,10 +201,12 @@ export function TransactionForm({ type, onSuccess, trigger, open: openProp, onOp
                 data_vencimento: formatDateToISO(values.data),
                 data_pagamento: status === 'liquidado' ? formatDateToISO(values.data) : null,
                 status,
-                is_recorrente: !!values.recorrencia,
+                is_recorrente: values.is_recorrente,
                 parcela_atual: null,
                 total_parcelas: null,
-            }, values.is_parcelado && values.total_parcelas ? values.total_parcelas : undefined)
+            },
+                values.is_parcelado && values.total_parcelas ? values.total_parcelas : undefined,
+                values.is_recorrente && !values.is_parcelado ? values.meses_recorrencia : undefined)
 
             if (success) {
                 setOpen(false)
@@ -488,6 +496,7 @@ export function TransactionForm({ type, onSuccess, trigger, open: openProp, onOp
                                         <FormControl>
                                             <Checkbox
                                                 checked={field.value}
+                                                disabled={isRecorrente}
                                                 onCheckedChange={field.onChange}
                                             />
                                         </FormControl>
@@ -519,6 +528,53 @@ export function TransactionForm({ type, onSuccess, trigger, open: openProp, onOp
                                             </FormControl>
                                             <p className="text-xs text-muted-foreground">
                                                 Serão criadas {field.value || 2} transações mensais automaticamente
+                                            </p>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+
+                            <FormField
+                                control={form.control}
+                                name="is_recorrente"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={field.value}
+                                                disabled={isParcelado}
+                                                onCheckedChange={(v) => field.onChange(v === true)}
+                                            />
+                                        </FormControl>
+                                        <div className="space-y-1 leading-none">
+                                            <FormLabel className="cursor-pointer">Repetir todo mês</FormLabel>
+                                            <p className="text-xs text-muted-foreground">
+                                                Mesmo valor todo mês (ex.: salário, aluguel). Diferente de parcelar, o valor não é dividido.
+                                            </p>
+                                        </div>
+                                    </FormItem>
+                                )}
+                            />
+
+                            {isRecorrente && (
+                                <FormField
+                                    control={form.control}
+                                    name="meses_recorrencia"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Por quantos meses</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    type="number"
+                                                    min="2"
+                                                    max="60"
+                                                    value={field.value || ''}
+                                                    onChange={(e) => field.onChange(parseInt(e.target.value) || 2)}
+                                                />
+                                            </FormControl>
+                                            <p className="text-xs text-muted-foreground">
+                                                Serão criados {field.value || 2} lançamentos, um por mês, a partir da data escolhida. Os futuros ficam pendentes.
                                             </p>
                                             <FormMessage />
                                         </FormItem>
