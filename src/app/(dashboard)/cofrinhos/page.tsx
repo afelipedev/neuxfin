@@ -87,9 +87,11 @@ export default function CofrinhosPage() {
                     <p className="text-sm text-muted-foreground">Gerencie seus objetivos de longo prazo e liquidez diária</p>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
-                    <Button variant="outline" size="sm" className="bg-zinc-900/5 dark:bg-zinc-100/5 border-none w-full sm:w-auto justify-center">
-                        <Percent className="mr-2 h-4 w-4 text-orange-600" />
-                        Taxa CDI: 13,15%
+                    <Button asChild variant="outline" size="sm" className="bg-zinc-900/5 dark:bg-zinc-100/5 border-none w-full sm:w-auto justify-center">
+                        <Link href="/configuracoes?tab=perfil" title="Alterar a taxa CDI no perfil">
+                            <Percent className="mr-2 h-4 w-4 text-orange-600" />
+                            {loadingCdi ? <Skeleton className="h-4 w-20" /> : <>Taxa CDI: {cdiLabel}% a.a.</>}
+                        </Link>
                     </Button>
                     <Button
                         onClick={handleNewCofrinho}
