@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { Inbox, Wallet } from "lucide-react"
+import { Inbox, Pencil, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Amount, EmptyState, IconTile, MonthStepper, PageHeader, SectionCard, StatCard, StatGrid, ToneBadge } from "@/components/ds"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -31,7 +31,21 @@ import type { StatementTx } from "@/features/bank-accounts/services/balances"
 
 /** Ações por linha do extrato: transferência pode ser excluída; ajuste, desfeito. */
 function RowActions({ tx }: { tx: StatementTx }) {
-    if (tx.origem === "transferencia") return <DeleteTransferButton transferId={tx.ref_id} />
+    if (tx.origem === "transferencia") {
+        return (
+            <span className="inline-flex items-center">
+                <TransferDialog
+                    transferId={tx.ref_id}
+                    trigger={
+                        <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label="Editar transferência">
+                            <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                    }
+                />
+                <DeleteTransferButton transferId={tx.ref_id} />
+            </span>
+        )
+    }
     if (tx.origem === "ajuste") return <RemoveAdjustmentButton adjustmentId={tx.ref_id} />
     return null
 }
@@ -121,7 +135,7 @@ export default function AccountStatementPage() {
                                         <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
                                         <TableHead className="text-right">Saldo</TableHead>
-                                        <TableHead className="w-12 px-4"><span className="sr-only">Ações</span></TableHead>
+                                        <TableHead className="w-20 px-4"><span className="sr-only">Ações</span></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>

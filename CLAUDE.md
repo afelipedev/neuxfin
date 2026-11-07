@@ -56,10 +56,10 @@ Tables in use: `transacoes`, `categorias`, `contas_bancarias`, `cartoes_credito`
 
 Migrations from 2026-11 onward live in `supabase/migrations/` and their filenames match the remote migration history (earlier ones exist only in Supabase). Integrity rules enforced in the database:
 - `transacoes`: `status` ∈ liquidado/pendente/atrasado, `valor > 0`, `liquidado ⇔ data_pagamento IS NOT NULL`, and `conta_id`/`cartao_id`/`categoria_id` must belong to the same user (trigger).
-- Deleting a bank account with linked transactions is blocked (trigger). Transfers and cofrinho movements use `ON DELETE RESTRICT`.
+- Deleting a bank account with linked transactions is blocked (trigger). Transfers and cofrinho movements use `ON DELETE RESTRICT`. Transfers can be edited (`updateTransfer`); the trigger revalidates both accounts.
 - Deleting a cofrinho with balance and account-linked movements is blocked (trigger).
 - Cofrinho aporte/resgate must go through the RPC `registrar_movimento_cofrinho` (atomic, row lock, balance check). Never update `cofrinhos.saldo_atual` from the client.
-- Invoice payment must go through the RPC `pagar_fatura` (records `faturas_pagamentos` and settles the purchases, setting `fatura_pagamento_id`). Reversal goes through `estornar_fatura`, which is a soft reversal (`estornado_em`). At most one active payment per card and month.
+- Invoice payment must go through the RPC `pagar_fatura(..., p_valor)` (records `faturas_pagamentos` and settles the purchases, setting `fatura_pagamento_id`). `p_valor` null pays everything; a smaller value is a partial payment: the rest is stored in `saldo_restante` and shows up as `saldo_anterior` of the next invoice (counted in its `em_aberto` and in the card limit until that invoice is paid; it is not a purchase or despesa). Reversal goes through `estornar_fatura` (soft, `estornado_em`); a partial payment whose rest was already paid by the next invoice can't be reversed first. At most one active payment per card and month.
 - `modelos_ia`: API keys live in Supabase Vault (`chave_secret_id`); `authenticated` can only SELECT the non-secret columns and writes go through the RPCs `salvar_modelo_ia` (create/update, empty key keeps the current one, marking a usage unsets it on the other models) and `remover_modelo_ia` (soft delete that overwrites the Vault secret). At most one active model per usage (`usar_chat`, `usar_analise`) per user.
 - Deleting a credit card with purchases is blocked (trigger). `contas_bancarias.padrao` allows at most one default account per user (partial unique index): unset the old default before setting a new one.
 - Recurring series ("Repetir todo mês") are created in a single INSERT by `createRecurringTransactions` (pure builder in `transactions/services/recurrence.ts`), share `recorrencia_id`, and can be deleted "this and next" with `deleteRecurrenceFrom` (keeps purchases already paid by an invoice). `transacoes.assinatura_id` links subscription expenses (unique per due date).
@@ -86,7 +86,8 @@ Migrations from 2026-11 onward live in `supabase/migrations/` and their filename
   - Cycle: a purchase made on or after the card's `dia_fechamento` goes to the next invoice. The invoice falls due in the same month as its closing date when `dia_vencimento > dia_fechamento`, otherwise in the following month. The invoice's competência is its due month.
   - Paying an invoice debits one account. It is not a despesa: the purchase was already counted in its own month.
   - Saldo previsto also subtracts open invoices due by the end of the month.
-  - Card limit used = open purchases, including future installments.
+  - Card limit used = open purchases, including future installments, plus partial-payment rests not yet paid.
+  - Invoice status `parcial` = paid with `saldo_restante > 0`.
 - `atrasado` is derived on read (`pendente` and `data_vencimento` < today) via `deriveStatus()`.
 - Money is summed in cents (`toCents`/`fromCents`) to avoid float drift.
 

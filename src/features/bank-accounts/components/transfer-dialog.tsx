@@ -24,18 +24,21 @@ import {
 } from "@/components/ui/select"
 import { BankAccount, settingsService } from "@/features/settings/services/settings-service"
 import { useTransactionContextOptional } from "@/features/transactions/context/transaction-context"
-import { createTransfer } from "../services/transfers"
+import { createTransfer, getTransfer, updateTransfer } from "../services/transfers"
+import { getErrorMessage } from "@/lib/utils"
 import { todayISO } from "../services/balances"
 import { DatePicker } from "@/components/ds"
 
 interface TransferDialogProps {
     /** Conta pré-selecionada como origem */
     defaultOrigemId?: string
+    /** Edição de uma transferência existente */
+    transferId?: string
     trigger?: React.ReactNode
 }
 
 /** Transferência entre contas do usuário. Não é receita nem despesa: só move saldo. */
-export function TransferDialog({ defaultOrigemId, trigger }: TransferDialogProps) {
+export function TransferDialog({ defaultOrigemId, transferId, trigger }: TransferDialogProps) {
     const notify = useTransactionContextOptional()?.notifyTransactionChange
     const [open, setOpen] = useState(false)
     const [saving, setSaving] = useState(false)
@@ -55,25 +58,42 @@ export function TransferDialog({ defaultOrigemId, trigger }: TransferDialogProps
         setData(todayISO())
         setDescricao("")
         settingsService.getBankAccounts().then(setAccounts).catch(console.error)
+        if (transferId) {
+            getTransfer(transferId)
+                .then(t => {
+                    setOrigem(t.conta_origem_id)
+                    setDestino(t.conta_destino_id)
+                    setValor(String(t.valor))
+                    setData(t.data)
+                    setDescricao(t.descricao ?? "")
+                })
+                .catch(err => {
+                    console.error(err)
+                    toast.error(getErrorMessage(err, "Erro ao carregar transferência"))
+                    setOpen(false)
+                })
+        }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         try {
             setSaving(true)
-            await createTransfer({
+            const payload = {
                 conta_origem_id: origem,
                 conta_destino_id: destino,
                 valor: Number(valor),
                 data,
                 descricao: descricao.trim() || null,
-            })
-            toast.success("Transferência registrada!")
+            }
+            if (transferId) await updateTransfer(transferId, payload)
+            else await createTransfer(payload)
+            toast.success(transferId ? "Transferência atualizada!" : "Transferência registrada!")
             notify?.()
             setOpen(false)
         } catch (err) {
             console.error(err)
-            toast.error(err instanceof Error ? err.message : "Erro ao registrar transferência")
+            toast.error(getErrorMessage(err, "Erro ao salvar transferência"))
         } finally {
             setSaving(false)
         }
@@ -93,7 +113,7 @@ export function TransferDialog({ defaultOrigemId, trigger }: TransferDialogProps
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Transferência entre contas</DialogTitle>
+                    <DialogTitle>{transferId ? "Editar transferência" : "Transferência entre contas"}</DialogTitle>
                     <DialogDescription>
                         Move saldo de uma conta para outra. Não conta como receita nem despesa.
                     </DialogDescription>
@@ -140,7 +160,7 @@ export function TransferDialog({ defaultOrigemId, trigger }: TransferDialogProps
                     )}
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancelar</Button>
-                        <Button type="submit" disabled={saving || !canSubmit}>{saving ? "Salvando..." : "Transferir"}</Button>
+                        <Button type="submit" disabled={saving || !canSubmit}>{saving ? "Salvando..." : transferId ? "Salvar" : "Transferir"}</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>

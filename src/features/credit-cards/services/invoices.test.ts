@@ -97,3 +97,47 @@ describe('status e totais da fatura', () => {
         expect(openInvoicesUntil(invoices, '2026-12-31')).toBe(80.25)
     })
 })
+
+describe('pagamento parcial', () => {
+    const p = (id: string, data: string, valor: number, status: CardPurchase['status'] = 'pendente', pag: string | null = null): CardPurchase =>
+        ({ id, cartao_id: 'c1', descricao: id, valor, data_vencimento: data, status, fatura_pagamento_id: pag })
+    // Fatura de nov (R$ 300) paga com R$ 100: R$ 200 vão para dezembro
+    const parcial: InvoicePayment = {
+        id: 'pay1', cartao_id: 'c1', competencia: '2026-11-01', conta_id: 'acc', valor: 100,
+        saldo_restante: '200', data_pagamento: '2026-11-09', estornado_em: null,
+    }
+    const purchases = [
+        p('a', '2026-10-10', 300, 'liquidado', 'pay1'), // fatura nov
+        p('b', '2026-11-20', 50.5),                     // fatura dez
+    ]
+    const today = '2026-11-15'
+
+    it('fatura paga com restante fica "parcial" e o restante entra na seguinte', () => {
+        const invoices = buildInvoices(nubank, purchases, [parcial], today)
+        expect(invoices.map(i => [i.key, i.status, i.total, i.saldo_anterior, i.em_aberto])).toEqual([
+            ['2026-11', 'parcial', 300, 0, 0],
+            ['2026-12', 'aberta', 250.5, 200, 250.5],
+        ])
+        expect(openInvoicesUntil(invoices, '2026-12-31')).toBe(250.5)
+    })
+
+    it('saldo restante cria a fatura seguinte mesmo sem compras', () => {
+        const invoices = buildInvoices(nubank, [purchases[0]], [parcial], today)
+        expect(invoices.map(i => [i.key, i.em_aberto])).toEqual([['2026-11', 0], ['2026-12', 200]])
+    })
+
+    it('quando a fatura seguinte é paga, o saldo anterior sai do em aberto e do limite', () => {
+        const dez: InvoicePayment = {
+            id: 'pay2', cartao_id: 'c1', competencia: '2026-12-01', conta_id: 'acc', valor: 250.5,
+            saldo_restante: 0, data_pagamento: '2026-12-09', estornado_em: null,
+        }
+        const pagas = [purchases[0], { ...purchases[1], status: 'liquidado' as const, fatura_pagamento_id: 'pay2' }]
+        const invoices = buildInvoices(nubank, pagas, [parcial, dez], '2026-12-15')
+        expect(invoices.map(i => [i.key, i.status, i.em_aberto])).toEqual([['2026-11', 'parcial', 0], ['2026-12', 'paga', 0]])
+        expect(cardLimitUsage(nubank, pagas, [parcial, dez])).toEqual({ usado: 0, disponivel: 1000 })
+    })
+
+    it('limite usado inclui o saldo carregado ainda não pago', () => {
+        expect(cardLimitUsage(nubank, purchases, [parcial])).toEqual({ usado: 250.5, disponivel: 749.5 })
+    })
+})
