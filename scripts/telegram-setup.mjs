@@ -59,6 +59,7 @@ await call('setWebhook', {
 await call('setMyCommands', {
     commands: [
         { command: 'saldo', description: 'Saldo das contas e resumo do mês' },
+        { command: 'lembretes', description: 'Ligar/desligar lembretes diários (on/off)' },
         { command: 'ajuda', description: 'Exemplos do que posso fazer' },
         { command: 'desvincular', description: 'Desconectar este Telegram do NeuxFin' },
     ],

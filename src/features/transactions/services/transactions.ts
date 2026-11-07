@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { parseLocalDate, formatDateToISO, dateInMonthClamped } from '@/lib/utils'
 import { buildRecurringSeries } from './recurrence'
+import { buildInstallments } from './installments'
 import {
     BalanceTx,
     computeProjectedBalance,
@@ -252,34 +253,7 @@ export async function createParceledTransaction(
         throw new Error('Usuário não autenticado')
     }
 
-    const totalCents = toCents(transaction.valor)
-    const baseCents = Math.floor(totalCents / totalParcelas)
-    const restoCents = totalCents - baseCents * totalParcelas
-
-    const dataBase = parseLocalDate(transaction.data_vencimento)
-    const paiId = crypto.randomUUID()
-
-    const transacoes = Array.from({ length: totalParcelas }, (_, idx) => {
-        const numero = idx + 1
-        const isPai = numero === 1
-        // Mesmo dia nos meses seguintes, limitado ao último dia do mês (31 → 28/29/30)
-        const vencimento = dateInMonthClamped(dataBase.getFullYear(), dataBase.getMonth() + idx, dataBase.getDate())
-
-        return {
-            ...transaction,
-            ...(isPai ? { id: paiId } : {}),
-            usuario_id: user.id,
-            valor: fromCents(isPai ? baseCents + restoCents : baseCents),
-            parcela_atual: numero,
-            total_parcelas: totalParcelas,
-            data_vencimento: formatDateToISO(vencimento),
-            descricao: `${transaction.descricao} (${numero}/${totalParcelas})`,
-            transacao_pai_id: isPai ? null : paiId,
-            // Só a 1ª parcela herda o status escolhido; as futuras nascem pendentes
-            status: isPai ? transaction.status : ('pendente' as const),
-            data_pagamento: isPai ? transaction.data_pagamento : null,
-        }
-    })
+    const transacoes = buildInstallments({ ...transaction, usuario_id: user.id }, totalParcelas, crypto.randomUUID())
 
     const { data, error } = await supabase
         .from('transacoes')

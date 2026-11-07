@@ -126,7 +126,7 @@ begin
     set local role anon;
     foreach t in array array['contas_bancarias', 'cartoes_credito', 'transacoes', 'assinaturas', 'cofrinhos', 'categorias',
                              'transferencias', 'ajustes_saldo', 'orcamentos', 'faturas_pagamentos', 'perfis', 'modelos_ia',
-                             'telegram_vinculos', 'telegram_mensagens', 'telegram_updates', 'cofrinho_transacoes', 'vw_saldos_contas']
+                             'telegram_vinculos', 'telegram_mensagens', 'telegram_updates', 'telegram_lembretes_enviados', 'cofrinho_transacoes', 'vw_saldos_contas']
     loop
         begin
             execute format('select count(*) from public.%I', t) into n;

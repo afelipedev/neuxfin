@@ -14,6 +14,14 @@ import {
     markTransactionPaidCore,
     searchTransactionsCore,
 } from './finance-insights'
+import {
+    deleteTransactionCore,
+    payInvoiceCore,
+    removeBudgetCore,
+    savingsMovementCore,
+    setBudgetCore,
+    transferCore,
+} from './finance-actions'
 
 const USER = '11111111-2222-4333-8444-555555555555'
 
@@ -33,6 +41,7 @@ function fakeClient() {
                 }
                 return (...args: unknown[]) => {
                     if (prop === 'eq') rec.filters.push([String(args[0]), args[1]])
+                    if (prop === 'or') rec.filters.push(['or', args[0]])
                     return proxy
                 }
             },
@@ -49,7 +58,10 @@ function fakeClient() {
     return { client, queries }
 }
 
-const scoped = (q: Recorded) => q.filters.some(([col, val]) => (col === 'usuario_id' || col === 'cofrinho.usuario_id') && val === USER)
+const scoped = (q: Recorded) => q.filters.some(([col, val]) =>
+    ((col === 'usuario_id' || col === 'cofrinho.usuario_id') && val === USER)
+    // categorias: do usuário ou globais (usuario_id nulo)
+    || (col === 'or' && String(val).startsWith(`usuario_id.eq.${USER},`)))
 
 describe('funções *Core com client service-role', () => {
     it.each([
@@ -63,6 +75,12 @@ describe('funções *Core com client service-role', () => {
         ['get_spending_by_category', (c: SupabaseClient) => getSpendingByCategoryCore(c, 11, 2026, 'despesa', USER)],
         ['search_transactions', (c: SupabaseClient) => searchTransactionsCore(c, { busca: 'luz', categoria_nome: 'Casa', status: 'atrasado' }, USER)],
         ['mark_transaction_paid', (c: SupabaseClient) => markTransactionPaidCore(c, USER, { transacao_id: '99999999-2222-4333-8444-555555555555' })],
+        ['pay_invoice', (c: SupabaseClient) => payInvoiceCore(c, USER, { cartao_nome: 'Nubank' })],
+        ['savings_movement', (c: SupabaseClient) => savingsMovementCore(c, USER, { cofrinho_nome: 'Carro', tipo: 'aporte', valor: 10 })],
+        ['set_budget', (c: SupabaseClient) => setBudgetCore(c, USER, { categoria_nome: 'Mercado', valor_mensal: 100 })],
+        ['remove_budget', (c: SupabaseClient) => removeBudgetCore(c, USER, { categoria_nome: 'Mercado' })],
+        ['transfer', (c: SupabaseClient) => transferCore(c, USER, { conta_origem: 'A', conta_destino: 'B', valor: 10 })],
+        ['delete_transaction', (c: SupabaseClient) => deleteTransactionCore(c, USER, { transacao_id: '99999999-2222-4333-8444-555555555555' })],
     ])('%s filtra TODAS as consultas por usuario_id', async (_name, run) => {
         const { client, queries } = fakeClient()
         await run(client)
