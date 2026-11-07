@@ -13,6 +13,9 @@ import { DEFAULT_CDI_ANUAL, normalizeCdi } from "@/features/cofrinhos/services/p
 
 const supabase = createClient()
 
+const AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"]
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024
+
 export function ProfileSettings() {
     const [profile, setProfile] = React.useState({
         nome: "",
@@ -88,31 +91,28 @@ export function ProfileSettings() {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) throw new Error("Não autenticado")
 
-            const fileExt = file.name.split('.').pop()
-            const fileName = `${user.id}-${Date.now()}.${fileExt}`
+            if (!AVATAR_TYPES.includes(file.type)) throw new Error("Envie uma imagem PNG, JPG, WEBP ou GIF")
+            if (file.size > AVATAR_MAX_BYTES) throw new Error("A imagem deve ter no máximo 2 MB")
 
-            console.log('Uploading file:', fileName, 'to bucket: avatars')
+            // Cada usuário grava só na própria pasta (policy do bucket avatars)
+            const fileExt = file.type.split('/')[1] === 'jpeg' ? 'jpg' : file.type.split('/')[1]
+            const fileName = `${user.id}/${Date.now()}.${fileExt}`
 
-            const { data: uploadData, error: uploadError } = await supabase.storage
+            const { error: uploadError } = await supabase.storage
                 .from('avatars')
                 .upload(fileName, file, {
                     cacheControl: '3600',
-                    upsert: true
+                    upsert: true,
+                    contentType: file.type,
                 })
 
-            if (uploadError) {
-                console.error('Upload error:', uploadError)
-                throw uploadError
-            }
-
-            console.log('Upload successful:', uploadData)
+            if (uploadError) throw uploadError
 
             const { data: urlData } = supabase.storage
                 .from('avatars')
                 .getPublicUrl(fileName)
 
             const publicUrl = urlData.publicUrl
-            console.log('Public URL:', publicUrl)
 
             setProfile(prev => ({ ...prev, avatar_url: publicUrl }))
 

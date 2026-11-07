@@ -3,9 +3,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 /**
  * Rotas chamadas por serviços externos, sem sessão: cada uma valida o próprio segredo
- * (Telegram: X-Telegram-Bot-Api-Secret-Token; automações: Bearer AGENT_API_SECRET).
+ * (webhook: X-Telegram-Bot-Api-Secret-Token; lembretes: segredo do Vault enviado pelo pg_cron).
  */
-const SECRET_AUTH_ROUTES = ['/api/telegram/webhook', '/api/agent/process']
+const SECRET_AUTH_ROUTES = ['/api/telegram/webhook', '/api/telegram/lembretes']
 
 export async function proxy(request: NextRequest) {
     let response = NextResponse.next({

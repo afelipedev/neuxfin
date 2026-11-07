@@ -1,7 +1,9 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { authErrorMessage, passwordProblem } from '../password-policy'
 
 export async function login(formData: FormData) {
     const supabase = await createClient()
@@ -10,13 +12,15 @@ export async function login(formData: FormData) {
     const email = formData.get('email') as string
     const password = formData.get('password') as string
 
+    if (!email || !password) return { error: 'Informe e-mail e senha.' }
+
     const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
     })
 
     if (error) {
-        return { error: error.message }
+        return { error: authErrorMessage(error) }
     }
 
     // revalidatePath('/', 'layout') // Optional: clear cache
@@ -31,6 +35,16 @@ export async function signup(formData: FormData) {
     const password = formData.get('password') as string
     const name = formData.get('name') as string
 
+    // Mesma política configurada no Supabase (validada lá também)
+    const problem = passwordProblem(password ?? '')
+    if (problem) return { error: problem }
+
+    // Link de confirmação de e-mail volta para o callback do próprio app
+    const h = await headers()
+    const host = h.get('x-forwarded-host') ?? h.get('host')
+    const proto = h.get('x-forwarded-proto') ?? (host?.startsWith('localhost') ? 'http' : 'https')
+    const origin = host ? `${proto}://${host}` : undefined
+
     const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -38,13 +52,12 @@ export async function signup(formData: FormData) {
             data: {
                 full_name: name,
             },
-            // If we need email verification, use window.location.origin
-            // emailRedirectTo: `${origin}/auth/callback`,
+            emailRedirectTo: origin ? `${origin}/auth/callback?next=/dashboard` : undefined,
         },
     })
 
     if (error) {
-        return { error: error.message }
+        return { error: authErrorMessage(error) }
     }
 
     // If email confirmation is disabled in Supabase, valid session is created immediately
@@ -59,7 +72,7 @@ export async function signup(formData: FormData) {
     }
 
     // Otherwise return success to show message
-    return { success: true, message: 'Check your email to verify your account.' }
+    return { success: true, message: 'Conta criada! Enviamos um link de confirmação para o seu e-mail.' }
 }
 
 export async function logout() {

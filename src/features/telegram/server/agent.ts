@@ -1,12 +1,12 @@
 import { generateText, stepCountIs, type ModelMessage } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveModel } from '@/features/ai-models/server/resolve-model'
+import { createUserScopedClient } from '@/lib/supabase/user-token'
 import { buildFinanceTools, FINANCE_TOOLS_GUIDE } from '@/features/ai-chat/tools/finance-toolset'
 
 /** Mensagens anteriores usadas como contexto (janela curta: é uma conversa de chat). */
 const HISTORY_LIMIT = 10
 const HISTORY_WINDOW_MIN = 30
-const HISTORY_RETENTION_DAYS = 7
 
 const system = () => `Você é o "Amigão", assistente financeiro do app NeuxFin, conversando pelo Telegram.
 
@@ -53,21 +53,21 @@ async function saveExchange(supabase: Admin, userId: string, chatId: number, use
         { usuario_id: userId, chat_id: chatId, papel: 'user', conteudo: user },
         { usuario_id: userId, chat_id: chatId, papel: 'assistant', conteudo: assistant },
     ])
+    // Retenção (7 dias) fica com a rotina public.limpeza_rotina() no pg_cron
     if (error) console.error('[telegram] salvar histórico', error)
-
-    // Retenção: o histórico só serve de contexto imediato
-    const limite = new Date(Date.now() - HISTORY_RETENTION_DAYS * 86_400_000).toISOString()
-    await supabase.from('telegram_mensagens').delete().eq('usuario_id', userId).lt('created_at', limite)
 }
 
 /**
- * Agente financeiro do bot. `supabase` é o client service-role: as ferramentas recebem
- * userId e filtram TODAS as consultas por usuario_id.
+ * Agente financeiro do bot.
+ * - `admin` (service role) só toca no histórico da conversa (telegram_mensagens).
+ * - Os dados financeiros usam um client COM O TOKEN DO USUÁRIO: a RLS do banco garante
+ *   que nada de outro usuário é lido ou alterado; scopeToUser fica como segunda camada.
  */
-export async function runFinanceAgent(supabase: Admin, userId: string, chatId: number, message: string): Promise<string> {
+export async function runFinanceAgent(admin: Admin, userId: string, chatId: number, message: string): Promise<string> {
+    const userClient = createUserScopedClient(userId)
     const [resolved, history] = await Promise.all([
         resolveModel(userId, { usage: 'chat' }),
-        loadHistory(supabase, userId, chatId),
+        loadHistory(admin, userId, chatId),
     ])
 
     const { text } = await generateText({
@@ -76,11 +76,11 @@ export async function runFinanceAgent(supabase: Admin, userId: string, chatId: n
         system: system(),
         messages: [...history, { role: 'user', content: message }],
         stopWhen: stepCountIs(6),
-        tools: buildFinanceTools(supabase, userId),
+        tools: buildFinanceTools(userClient, userId),
     })
 
     const reply = text.trim() || 'Feito! 👍'
-    await saveExchange(supabase, userId, chatId, message, reply)
+    await saveExchange(admin, userId, chatId, message, reply)
     return reply
 }
 
