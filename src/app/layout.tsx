@@ -1,26 +1,45 @@
-import type { Metadata } from "next";
-import { Outfit, Lexend } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Outfit } from "next/font/google";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
+import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import "./globals.css";
 
+/** Família única do design system (títulos, corpo e números). */
 const outfit = Outfit({
   variable: "--font-outfit",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
-});
-
-const lexend = Lexend({
-  variable: "--font-lexend",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "NeuxFin | Gestão Financeira Inteligente",
-  description: "Dashboard financeiro premium com análise por IA e controle total de PF/PJ.",
+  title: {
+    default: "NeuxFin | Gestão Financeira Inteligente",
+    template: "%s | NeuxFin",
+  },
+  description: "Dashboard financeiro com análise por IA e controle total de PF/PJ.",
+  applicationName: "NeuxFin",
+  appleWebApp: {
+    capable: true,
+    title: "NeuxFin",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: { telephone: false },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
-import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f8fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0b0f" },
+  ],
+};
 
 export default function RootLayout({
   children,
@@ -30,7 +49,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body
-        className={`${outfit.variable} ${lexend.variable} font-body antialiased selection:bg-[#26c8a6]/30 overflow-x-hidden`}
+        className={`${outfit.variable} font-body antialiased overflow-x-hidden`}
         suppressHydrationWarning
       >
         <ThemeProvider
@@ -40,8 +59,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <Toaster position="top-right" richColors />
+          <Toaster position="top-center" richColors closeButton />
         </ThemeProvider>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

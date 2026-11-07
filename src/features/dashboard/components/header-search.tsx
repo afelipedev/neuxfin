@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { ArrowDownCircle, ArrowUpCircle, Loader2, Search, Sparkles } from "lucide-react"
+import { ArrowDownCircle, ArrowUpCircle, Loader2, Search, Sparkles, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { format } from "date-fns"
 import { cn, formatCurrency, parseLocalDate } from "@/lib/utils"
 import { searchTransactions, type Transaction } from "@/features/transactions/services/transactions"
@@ -21,6 +22,8 @@ export function HeaderSearch({ onAskAI }: { onAskAI: (question: string) => void 
     const [open, setOpen] = React.useState(false)
     const [active, setActive] = React.useState(0)
     const [editing, setEditing] = React.useState<Transaction | null>(null)
+    // Mobile: a busca abre sobre o cabeçalho a partir de um ícone
+    const [mobileOpen, setMobileOpen] = React.useState(false)
     const containerRef = React.useRef<HTMLDivElement>(null)
     const inputRef = React.useRef<HTMLInputElement>(null)
     const listId = React.useId()
@@ -64,6 +67,10 @@ export function HeaderSearch({ onAskAI }: { onAskAI: (question: string) => void 
         return () => document.removeEventListener("keydown", onKey)
     }, [])
 
+    React.useEffect(() => {
+        if (mobileOpen) inputRef.current?.focus()
+    }, [mobileOpen])
+
     const choose = (index: number) => {
         if (index < results.length) {
             setEditing(results[index])
@@ -73,11 +80,13 @@ export function HeaderSearch({ onAskAI }: { onAskAI: (question: string) => void 
             setResults([])
         }
         setOpen(false)
+        setMobileOpen(false)
     }
 
     const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Escape") {
             setOpen(false)
+            setMobileOpen(false)
             inputRef.current?.blur()
             return
         }
@@ -99,8 +108,25 @@ export function HeaderSearch({ onAskAI }: { onAskAI: (question: string) => void 
     const showPanel = open && term.length >= 2
 
     return (
-        <div ref={containerRef} className="relative hidden md:block">
-            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-zinc-900/5 dark:bg-zinc-100/5 border border-border min-w-[320px] focus-within:border-brand-1/50 focus-within:bg-brand-1/5 transition-all group">
+        <div ref={containerRef} className="relative">
+            <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground md:hidden"
+                aria-label="Buscar"
+                onClick={() => setMobileOpen(true)}
+            >
+                <Search />
+            </Button>
+            <div
+                className={cn(
+                    mobileOpen
+                        ? "fixed inset-x-0 top-0 z-50 flex items-center gap-2 border-b bg-background px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] shadow-lg"
+                        : "hidden",
+                    "md:static md:flex md:border-0 md:bg-transparent md:p-0 md:shadow-none"
+                )}
+            >
+            <div className="group flex h-10 flex-1 items-center gap-3 rounded-lg border bg-muted/60 px-3 transition-colors focus-within:border-ring focus-within:bg-background md:min-w-[320px] lg:min-w-[380px]">
                 <Search className="h-4 w-4 text-muted-foreground group-focus-within:text-brand-1 transition-colors" aria-hidden="true" />
                 <input
                     ref={inputRef}
@@ -115,18 +141,23 @@ export function HeaderSearch({ onAskAI }: { onAskAI: (question: string) => void 
                     onFocus={() => setOpen(true)}
                     onKeyDown={onKeyDown}
                     placeholder="Buscar transações ou perguntar à IA..."
-                    className="bg-transparent border-none outline-none text-xs w-full placeholder:text-muted-foreground/50 font-medium text-foreground"
+                    className="w-full border-none bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground md:text-sm"
                 />
                 {searching
                     ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden="true" />
-                    : <kbd className="hidden lg:inline text-[10px] text-muted-foreground/60 border border-border rounded px-1.5">/</kbd>}
+                    : <kbd className="hidden rounded border px-1.5 text-2xs text-muted-foreground lg:inline">/</kbd>}
             </div>
+            {mobileOpen && (
+                <Button variant="ghost" size="icon" className="md:hidden" aria-label="Fechar busca" onClick={() => { setMobileOpen(false); setOpen(false) }}>
+                    <X />
+                </Button>
+            )}
 
             {showPanel && (
                 <div
                     id={listId}
                     role="listbox"
-                    className="absolute left-0 right-0 top-full mt-2 z-50 rounded-xl border border-border bg-popover text-popover-foreground shadow-xl overflow-hidden"
+                    className="absolute inset-x-3 top-full z-50 mt-2 max-h-[70dvh] overflow-y-auto rounded-xl border bg-popover text-popover-foreground shadow-xl md:inset-x-0"
                 >
                     {results.length === 0 && !searching && (
                         <p className="px-4 py-3 text-xs text-muted-foreground">Nenhuma transação com “{term}”.</p>
@@ -143,18 +174,18 @@ export function HeaderSearch({ onAskAI }: { onAskAI: (question: string) => void 
                                 onMouseEnter={() => setActive(i)}
                                 onClick={() => choose(i)}
                                 className={cn(
-                                    "flex w-full items-center gap-3 px-4 py-2.5 text-left text-xs transition-colors",
+                                    "flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors md:py-2.5 md:text-xs",
                                     active === i && "bg-brand-1/10"
                                 )}
                             >
-                                <Icon className={cn("h-4 w-4 shrink-0", t.tipo_transacao === "receita" ? "text-emerald-500" : "text-rose-500")} aria-hidden="true" />
+                                <Icon className={cn("h-4 w-4 shrink-0", t.tipo_transacao === "receita" ? "text-success" : "text-destructive")} aria-hidden="true" />
                                 <span className="min-w-0 flex-1">
                                     <span className="block truncate font-semibold">{t.descricao}</span>
-                                    <span className="block text-[10px] text-muted-foreground">
+                                    <span className="block text-2xs text-muted-foreground">
                                         {format(parseLocalDate(t.data_vencimento), "dd/MM/yyyy")} · {t.categoria?.nome ?? "Sem categoria"} · {STATUS_LABEL[status]}
                                     </span>
                                 </span>
-                                <span className={cn("font-bold tabular-nums", t.tipo_transacao === "receita" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                                <span className={cn("font-bold tabular-nums", t.tipo_transacao === "receita" ? "text-success" : "text-destructive")}>
                                     {t.tipo_transacao === "receita" ? "+" : "−"}{formatCurrency(t.valor)}
                                 </span>
                             </button>
@@ -167,7 +198,7 @@ export function HeaderSearch({ onAskAI }: { onAskAI: (question: string) => void 
                         onMouseEnter={() => setActive(results.length)}
                         onClick={() => choose(results.length)}
                         className={cn(
-                            "flex w-full items-center gap-3 border-t border-border px-4 py-2.5 text-left text-xs transition-colors",
+                            "flex w-full items-center gap-3 border-t px-4 py-3 text-left text-sm transition-colors md:py-2.5 md:text-xs",
                             active === results.length && "bg-brand-1/10"
                         )}
                     >
@@ -178,6 +209,7 @@ export function HeaderSearch({ onAskAI }: { onAskAI: (question: string) => void 
                     </button>
                 </div>
             )}
+            </div>
 
             {editing && (
                 <EditTransactionDialog

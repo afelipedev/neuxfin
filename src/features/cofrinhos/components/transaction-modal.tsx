@@ -35,6 +35,7 @@ import { Cofrinho } from "../services/cofrinhos"
 import { BankAccount, settingsService } from "@/features/settings/services/settings-service"
 import { todayISO } from "@/features/bank-accounts/services/balances"
 import { parseLocalDate, formatCurrency } from "@/lib/utils"
+import { DatePicker } from "@/components/ds"
 
 const NO_ACCOUNT = "__none__"
 
@@ -116,12 +117,12 @@ export function TransactionModal({ open, onOpenChange, cofrinho, tipo, onSuccess
                     <DialogTitle className="flex items-center gap-2">
                         {tipo === 'aporte' ? (
                             <>
-                                <ArrowUpCircle className="h-5 w-5 text-emerald-500" />
+                                <ArrowUpCircle className="h-5 w-5 text-success" />
                                 Realizar Aporte
                             </>
                         ) : (
                             <>
-                                <ArrowDownCircle className="h-5 w-5 text-rose-500" />
+                                <ArrowDownCircle className="h-5 w-5 text-destructive" />
                                 Realizar Resgate
                             </>
                         )}
@@ -150,9 +151,9 @@ export function TransactionModal({ open, onOpenChange, cofrinho, tipo, onSuccess
                             name="data"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Data da Movimentação</FormLabel>
+                                    <FormLabel>Data da movimentação</FormLabel>
                                     <FormControl>
-                                        <Input type="date" {...field} />
+                                        <DatePicker value={field.value} onChange={field.onChange} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -182,7 +183,7 @@ export function TransactionModal({ open, onOpenChange, cofrinho, tipo, onSuccess
                         />
 
                         {tipo === 'resgate' && (
-                            <div className="bg-orange-500/10 p-3 rounded-lg flex gap-2 text-xs text-orange-600 font-medium">
+                            <div className="bg-brand-3/10 p-3 rounded-lg flex gap-2 text-xs text-brand-3 font-medium">
                                 <Info className="h-4 w-4 shrink-0" />
                                 <p>O resgate será descontado do saldo deste cofrinho{form.watch("conta_id") !== NO_ACCOUNT ? " e creditado na conta escolhida" : ""}.</p>
                             </div>
@@ -192,9 +193,9 @@ export function TransactionModal({ open, onOpenChange, cofrinho, tipo, onSuccess
                             <Button
                                 type="submit"
                                 disabled={loading}
-                                className={`w-full ${tipo === 'aporte' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}
+                                className="w-full"
                             >
-                                {loading ? "Processando..." : tipo === 'aporte' ? "Confirmar Aporte" : "Confirmar Resgate"}
+                                {loading ? "Processando..." : tipo === 'aporte' ? "Confirmar aporte" : "Confirmar resgate"}
                             </Button>
                         </DialogFooter>
                     </form>

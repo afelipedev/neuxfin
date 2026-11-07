@@ -1,73 +1,90 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 @source "../**/*.{ts,tsx}";
 /* Catálogo de skills vendorizado: fora da varredura de classes (evitava warning de CSS no build) */
 @source not "../../.agent";
 @custom-variant dark (&:is(.dark *));
 
-html {
-  scroll-behavior: smooth;
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(38, 200, 166, 0.4);
-}
+/*
+ * ============================================================================
+ *  NeuxFin Design System — tokens
+ *  Documentação: docs/design-system.md
+ *
+ *  Camadas:
+ *   1. Neutros (superfícies e texto) ........ background, card, muted, border...
+ *   2. Marca ................................ primary (CTA) + brand-1/2/3
+ *        brand-1 = primária  (Teal Neux)   → marca, ações, destaque
+ *        brand-2 = secundária (Indigo)     → PF, assinaturas, IA, links de apoio
+ *        brand-3 = terciária  (Laranja)    → PJ, cofrinhos/reservas
+ *   3. Semânticos ........................... success, warning, destructive, info
+ *        success = receita / pago        warning = pendente / atenção
+ *        destructive = despesa / atraso  info = fatura aberta / dicas
+ *   4. Gráficos ............................. chart-1..8
+ *
+ *  Regra: tokens de cor são "seguros para texto" no tema atual (≥ 4,5:1 sobre
+ *  background e card). Fundos suaves usam opacidade: bg-success/10 text-success.
+ *  Preenchimento sólido usa o par cor + *-foreground (bg-primary text-primary-foreground).
+ * ============================================================================
+ */
 
 @theme inline {
-  --font-display: var(--font-outfit), ui-sans-serif, system-ui;
-  --font-body: var(--font-lexend), ui-sans-serif, system-ui;
+  /* Família única: Outfit. font-display e font-body apontam para ela (aliases mantidos) */
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
 
+  /* Escala tipográfica: 2xs (11px) é o menor tamanho permitido */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  /* Neutros */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  /* Marca */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
   --color-brand-1: var(--brand-1);
+  --color-brand-1-foreground: var(--brand-1-foreground);
   --color-brand-2: var(--brand-2);
+  --color-brand-2-foreground: var(--brand-2-foreground);
   --color-brand-3: var(--brand-3);
-  --color-brand-4: var(--brand-4);
-  --color-brand-5: var(--brand-5);
+  --color-brand-3-foreground: var(--brand-3-foreground);
 
-  --color-neux-1: var(--brand-1);
-  --color-neux-2: var(--brand-2);
-  --color-neux-3: var(--brand-3);
-  --color-neux-4: var(--brand-4);
-  --color-neux-5: var(--brand-5);
+  /* Semânticos */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
 
-  --color-chart-1: var(--brand-1);
-  --color-chart-2: var(--brand-2);
-  --color-chart-3: var(--brand-3);
-  --color-chart-4: var(--brand-4);
-  --color-chart-5: var(--brand-5);
+  /* Gráficos (categóricos) */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
 
-
+  /* Sidebar (shadcn) */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -77,100 +94,178 @@ html {
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  /* Raios: sm 8 · md 10 · lg 12 · xl 16 · 2xl 20 */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
-
-  --shadow-glow-primary: 0 0 20px -5px rgba(38, 200, 166, 0.3);
 }
 
 :root {
-  --background: #f8fafc;
-  --foreground: #020617;
-  --card: #ffffff;
-  --card-foreground: #020617;
-  --popover: #ffffff;
-  --popover-foreground: #020617;
-  --primary: #26c8a6;
-  --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #f1f5f9;
-  --accent-foreground: #0f172a;
-  --destructive: #ef4444;
-  --destructive-foreground: #fafafa;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #26c8a6;
-  --radius: 1rem;
+  --radius: 0.75rem;
 
-  --brand-1: #26c8a6;
-  --brand-2: #45d6bc;
-  --brand-3: #64e4d3;
-  --brand-4: #83f1e9;
-  --brand-5: #a2ffff;
+  --background: #f6f8fa;
+  --foreground: #0b1220;
+  --card: #ffffff;
+  --card-foreground: #0b1220;
+  --popover: #ffffff;
+  --popover-foreground: #0b1220;
+  --secondary: #eef2f6;
+  --secondary-foreground: #0f172a;
+  --muted: #eef2f6;
+  --muted-foreground: #5b6474;
+  --accent: #eef2f6;
+  --accent-foreground: #0f172a;
+  --border: #e3e8ef;
+  --input: #d9e0e8;
+  --ring: #26c8a6;
+
+  /* Preenchimento do CTA principal (igual nos dois temas) */
+  --primary: #26c8a6;
+  --primary-foreground: #04241d;
+
+  --brand-1: #0a7d68;
+  --brand-1-foreground: #ffffff;
+  --brand-2: #4f46e5;
+  --brand-2-foreground: #ffffff;
+  --brand-3: #c2410c;
+  --brand-3-foreground: #ffffff;
+
+  --success: #047857;
+  --success-foreground: #ffffff;
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+  --destructive: #d11a44;
+  --destructive-foreground: #ffffff;
+  --info: #0369a1;
+  --info-foreground: #ffffff;
+
+  --chart-1: #26c8a6;
+  --chart-2: #6366f1;
+  --chart-3: #f97316;
+  --chart-4: #0ea5e9;
+  --chart-5: #f43f5e;
+  --chart-6: #eab308;
+  --chart-7: #a855f7;
+  --chart-8: #64748b;
+  --chart-grid: #e3e8ef;
+  --chart-axis: #5b6474;
 
   --sidebar: #ffffff;
   --sidebar-foreground: #475569;
   --sidebar-primary: #26c8a6;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f1f5f9;
+  --sidebar-primary-foreground: #04241d;
+  --sidebar-accent: #eef2f6;
   --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #f1f5f9;
+  --sidebar-border: #e3e8ef;
   --sidebar-ring: #26c8a6;
 
   /* Cabeçalho de tabelas/listas */
-  --table-header: #e8edf3;
+  --table-header: #eef2f6;
   --table-header-foreground: #475569;
+
+  /* Altura da barra de navegação inferior (mobile) */
+  --bottom-nav-height: 4rem;
+
+  /* Elevação */
+  --shadow-card: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.08);
+  --shadow-card-hover: 0 2px 4px -1px rgb(15 23 42 / 0.06), 0 12px 24px -8px rgb(15 23 42 / 0.16);
+  --shadow-overlay: 0 10px 30px -10px rgb(15 23 42 / 0.25), 0 4px 10px -4px rgb(15 23 42 / 0.1);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 450ms;
+  --stagger-step: 45ms;
 }
 
 .dark {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #09090b;
-  --card-foreground: #fafafa;
-  --popover: #09090b;
-  --popover-foreground: #fafafa;
-  --primary: #26c8a6;
-  --primary-foreground: #09090b;
-  --secondary: #27272a;
-  --secondary-foreground: #fafafa;
-  --muted: #18181b;
+  --background: #09090c;
+  --foreground: #f4f4f5;
+  --card: #131318;
+  --card-foreground: #f4f4f5;
+  --popover: #16161c;
+  --popover-foreground: #f4f4f5;
+  --secondary: #1f1f26;
+  --secondary-foreground: #f4f4f5;
+  --muted: #1b1b21;
   --muted-foreground: #a1a1aa;
-  --accent: #27272a;
-  --accent-foreground: #fafafa;
-  --destructive: #7f1d1d;
-  --destructive-foreground: #fafafa;
-  --border: #27272a;
-  --input: #27272a;
+  --accent: #23232b;
+  --accent-foreground: #f4f4f5;
+  --border: #23232b;
+  --input: #2e2e37;
   --ring: #26c8a6;
-  --radius: 0.75rem;
 
-  --sidebar: #09090b;
+  --primary: #26c8a6;
+  --primary-foreground: #04241d;
+
+  --brand-1: #2dd4b0;
+  --brand-1-foreground: #04241d;
+  --brand-2: #a5b4fc;
+  --brand-2-foreground: #12123a;
+  --brand-3: #fb923c;
+  --brand-3-foreground: #2a1203;
+
+  --success: #34d399;
+  --success-foreground: #022c22;
+  --warning: #fbbf24;
+  --warning-foreground: #1f1300;
+  --destructive: #fb7185;
+  --destructive-foreground: #2a0610;
+  --info: #38bdf8;
+  --info-foreground: #062033;
+
+  --chart-1: #2dd4b0;
+  --chart-2: #818cf8;
+  --chart-3: #fb923c;
+  --chart-4: #38bdf8;
+  --chart-5: #fb7185;
+  --chart-6: #facc15;
+  --chart-7: #c084fc;
+  --chart-8: #94a3b8;
+  --chart-grid: #26262e;
+  --chart-axis: #a1a1aa;
+
+  --sidebar: #0f0f13;
   --sidebar-foreground: #a1a1aa;
   --sidebar-primary: #26c8a6;
-  --sidebar-primary-foreground: #09090b;
-  --sidebar-accent: #18181b;
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #18181b;
+  --sidebar-primary-foreground: #04241d;
+  --sidebar-accent: #1b1b21;
+  --sidebar-accent-foreground: #f4f4f5;
+  --sidebar-border: #1f1f26;
   --sidebar-ring: #26c8a6;
 
-  --table-header: #232327;
+  --table-header: #1b1b21;
   --table-header-foreground: #d4d4d8;
+
+  /* No escuro a sombra precisa ser mais densa e ganha um brilho interno no topo
+     (a luz "vem de cima"), senão o card vira só uma linha de contorno. */
+  --shadow-card: inset 0 1px 0 0 rgb(255 255 255 / 0.06), 0 1px 2px 0 rgb(0 0 0 / 0.6), 0 8px 24px -6px rgb(0 0 0 / 0.9);
+  --shadow-card-hover: inset 0 1px 0 0 rgb(255 255 255 / 0.07), 0 2px 4px 0 rgb(0 0 0 / 0.5), 0 16px 32px -10px rgb(0 0 0 / 0.85);
+  --shadow-overlay: inset 0 1px 0 0 rgb(255 255 255 / 0.06), 0 20px 40px -12px rgb(0 0 0 / 0.9), 0 6px 14px -6px rgb(0 0 0 / 0.6);
 }
 
 @layer base {
   * {
-    @apply border-border outline-none;
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
   }
 
   body {
     @apply bg-background text-foreground font-body antialiased;
-    font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03";
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 30%, transparent);
   }
 
   h1,
@@ -181,56 +276,237 @@ html {
   h6 {
     @apply font-display tracking-tight text-foreground;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
-/* Page Transitions */
-.page-transition {
-  animation: fadeIn 0.4s ease-out;
+/* Rótulo curto em caixa alta (títulos de seção, legendas de KPI) */
+@utility eyebrow {
+  font-size: var(--text-2xs);
+  line-height: var(--text-2xs--line-height);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
 }
 
-@keyframes fadeIn {
+/* Áreas seguras (notch / barra de gestos) para PWA em tela cheia */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Espaço reservado para a navegação inferior no mobile */
+@utility pb-bottom-nav {
+  padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 1.5rem);
+}
+
+@utility custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 30%, transparent) transparent;
+}
+
+/* Barras de rolagem visíveis nos dois temas */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent) transparent;
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ *  Motion design
+ *  Princípios: entradas curtas (≤ 450ms) com ease-out, nada que bloqueie a
+ *  leitura de valores, e tudo desligado com prefers-reduced-motion.
+ * ---------------------------------------------------------------------------
+ */
+@keyframes rise-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
-/* Custom Scrollbar for Sidebar and Containers */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(38, 200, 166, 0.1);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(38, 200, 166, 0.3);
-}
-
-@layer components {
-  .glass-card {
-    @apply bg-white/70 dark:bg-zinc-900/40 backdrop-blur-xl border border-white/20 dark:border-white/5 shadow-sm;
-  }
-
-  .glow-primary {
-    @apply shadow-glow-primary;
+@keyframes progress-in {
+  from {
+    transform: translateX(-100%);
   }
 }
+
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Transição de página */
+.page-transition {
+  animation: rise-in var(--duration-slow) var(--ease-out) both;
+}
+
+/* Filhos entram em cascata (grades de KPIs, listas, cards) */
+@utility stagger {
+  & > * {
+    animation: rise-in var(--duration-slow) var(--ease-out) both;
+  }
+
+  & > :nth-child(2) { animation-delay: calc(var(--stagger-step) * 1); }
+  & > :nth-child(3) { animation-delay: calc(var(--stagger-step) * 2); }
+  & > :nth-child(4) { animation-delay: calc(var(--stagger-step) * 3); }
+  & > :nth-child(5) { animation-delay: calc(var(--stagger-step) * 4); }
+  & > :nth-child(6) { animation-delay: calc(var(--stagger-step) * 5); }
+  & > :nth-child(7) { animation-delay: calc(var(--stagger-step) * 6); }
+  & > :nth-child(8) { animation-delay: calc(var(--stagger-step) * 7); }
+  & > :nth-child(n + 9) { animation-delay: calc(var(--stagger-step) * 8); }
+}
+
+/* Card clicável: sobe levemente e ganha sombra */
+@utility lift {
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-card-hover);
+    }
+  }
+
+  &:active {
+    transform: translateY(0) scale(0.985);
+    transition-duration: var(--duration-fast);
+  }
+}
+
+@utility animate-pop {
+  animation: pop-in var(--duration-base) var(--ease-spring) both;
+}
+
 /*
- * Cabeçalho das tabelas (shadcn <TableHeader> → data-slot="table-header").
- * Fora de @layer de propósito: vale para todas as tabelas, mesmo com utilitários de cor nas células.
+ * Regras globais sobre os primitivos do shadcn (sem editar src/components/ui).
+ * Fora de @layer de propósito: precisam vencer os utilitários de tamanho.
  */
+
+/* Diálogos nunca passam da altura da tela no mobile */
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"] {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Elevação dos cards (sobrescreve o shadow-sm do primitivo nos dois temas) */
+[data-slot="card"] {
+  box-shadow: var(--shadow-card);
+}
+
+/* Sobreposições: popover, menus, selects e diálogos */
+[data-slot="popover-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="select-content"],
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"],
+[data-slot="sheet-content"] {
+  box-shadow: var(--shadow-overlay);
+}
+
+/* Feedback de toque em todos os botões */
+[data-variant][data-size] {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-out);
+}
+
+[data-variant][data-size]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Skeleton com brilho deslizante em vez de piscar */
+[data-slot="skeleton"] {
+  animation: shimmer 1.6s var(--ease-in-out) infinite;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--foreground) 6%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Barras de progresso preenchem ao aparecer */
+[data-slot="progress-indicator"] {
+  animation: progress-in 0.9s var(--ease-out);
+  transition: transform var(--duration-slow) var(--ease-out);
+}
+
+/* Botão destrutivo com o par de tokens (o primitivo usa text-white, ilegível no tema escuro) */
+[data-variant="destructive"][data-size] {
+  background-color: var(--destructive);
+  color: var(--destructive-foreground);
+}
+
+[data-variant="destructive"][data-size]:hover {
+  background-color: color-mix(in oklab, var(--destructive) 90%, var(--foreground));
+}
+
+/* Alvos de toque mínimos (44px) em telas touch */
+@media (pointer: coarse) {
+  /* data-slot pode ser sobrescrito por gatilhos Radix (asChild); data-variant/data-size permanecem */
+  [data-variant][data-size^="icon"] {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  [data-variant][data-size]:not([data-size^="icon"]),
+  [data-slot="select-trigger"],
+  [data-slot="tabs-trigger"] {
+    min-height: 2.75rem;
+  }
+
+  [data-slot="dropdown-menu-item"],
+  [data-slot="select-item"] {
+    min-height: 2.75rem;
+  }
+}
+
+/* Cabeçalho das tabelas (shadcn <TableHeader> → data-slot="table-header") */
 [data-slot="table-header"] {
   background-color: var(--table-header);
 }
@@ -243,4 +519,8 @@ html {
 
 [data-slot="table-header"] th {
   color: var(--table-header-foreground);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }

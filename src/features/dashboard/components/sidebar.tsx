@@ -1,163 +1,79 @@
 "use client"
 
-import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-    LayoutDashboard,
-    ArrowUpRight,
-    ArrowDownRight,
-    Repeat,
-    CreditCard,
-    Wallet,
-    PieChart,
-    Settings,
-    LogOut,
-} from "lucide-react"
-
+import { LogOut } from "lucide-react"
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarGroup,
-    SidebarGroupLabel,
-    SidebarGroupContent,
+    useSidebar,
 } from "@/components/ui/sidebar"
-
+import { Logo } from "@/components/ds"
 import { useAuth } from "@/features/auth/hooks/use-auth"
+import { MAIN_NAV, SETTINGS_NAV, isNavActive, type NavItem } from "../nav-items"
 
-const items = [
-    {
-        title: "Dashboard",
-        url: "/dashboard",
-        icon: LayoutDashboard,
-    },
-    {
-        title: "Receitas",
-        url: "/receitas",
-        icon: ArrowUpRight,
-    },
-    {
-        title: "Despesas",
-        url: "/despesas",
-        icon: ArrowDownRight,
-    },
-    {
-        title: "Cartões",
-        url: "/cartoes",
-        icon: CreditCard,
-    },
-    {
-        title: "Assinaturas",
-        url: "/assinaturas",
-        icon: Repeat,
-    },
-    {
-        title: "Cofrinhos",
-        url: "/cofrinhos",
-        icon: Wallet,
-    },
-    {
-        title: "Relatórios",
-        url: "/relatorios",
-        icon: PieChart,
-    },
-]
+const itemClass =
+    "h-10 rounded-lg text-sidebar-foreground transition-colors hover:bg-brand-1/10 hover:text-brand-1 data-[active=true]:bg-brand-1/15 data-[active=true]:font-semibold data-[active=true]:text-brand-1"
 
-const configItems = [
-    {
-        title: "Configurações",
-        url: "/configuracoes",
-        icon: Settings,
-    },
-]
+function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
+    const pathname = usePathname()
+    const { setOpenMobile } = useSidebar()
+
+    return (
+        <SidebarGroup>
+            <SidebarGroupLabel className="eyebrow px-3">{label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+                <SidebarMenu>
+                    {items.map((item) => (
+                        <SidebarMenuItem key={item.url}>
+                            <SidebarMenuButton asChild isActive={isNavActive(pathname, item.url)} tooltip={item.title} className={itemClass}>
+                                <Link href={item.url} onClick={() => setOpenMobile(false)}>
+                                    <item.icon />
+                                    <span>{item.title}</span>
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    ))}
+                </SidebarMenu>
+            </SidebarGroupContent>
+        </SidebarGroup>
+    )
+}
 
 export function DashboardSidebar() {
-    const pathname = usePathname()
     const { logout } = useAuth()
 
     return (
-        <Sidebar collapsible="icon" className="border-r border-border bg-sidebar transition-colors duration-300">
-            <SidebarHeader className="flex items-center justify-start px-6 py-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-4">
-                <div className="flex items-center gap-3 group-data-[collapsible=icon]:gap-0">
-                    <div className="h-9 w-9 rounded-xl bg-brand-1 flex items-center justify-center shadow-lg shadow-brand-1/20 transition-transform hover:scale-105">
-                        <Wallet className="h-5 w-5 text-zinc-950" />
-                    </div>
-                    <span className="text-2xl font-black tracking-tighter text-foreground font-display group-data-[collapsible=icon]:hidden">
-                        Neux<span className="text-brand-1">Fin</span>
-                    </span>
-                </div>
+        <Sidebar collapsible="icon" className="border-r">
+            <SidebarHeader className="px-4 py-6 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-4">
+                <Link href="/dashboard" aria-label="NeuxFin — início" className="rounded-lg">
+                    <Logo className="group-data-[collapsible=icon]:[&>span:last-child]:hidden" />
+                </Link>
             </SidebarHeader>
-            <SidebarContent>
-                <SidebarGroup>
-                    <SidebarGroupLabel className="text-[10px] uppercase tracking-widest font-black text-muted-foreground/60 px-6 mb-2">Menu Principal</SidebarGroupLabel>
-                    <SidebarGroupContent>
-                        <SidebarMenu className="px-3 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-2">
-                            {items.map((item) => (
-                                <SidebarMenuItem key={item.title}>
-                                    <SidebarMenuButton
-                                        asChild
-                                        isActive={pathname === item.url}
-                                        tooltip={item.title}
-                                        className="h-10 rounded-lg hover:bg-brand-1/10 hover:text-brand-1 data-[active=true]:bg-brand-1/20 data-[active=true]:text-brand-1 transition-all duration-200 group text-sidebar-foreground"
-                                    >
-                                        <Link
-                                            href={item.url}
-                                            className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
-                                        >
-                                            <item.icon className="h-4 w-4 group-hover:scale-110 transition-transform" />
-                                            <span className="font-semibold text-sm tracking-tight group-data-[collapsible=icon]:hidden">
-                                                {item.title}
-                                            </span>
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            ))}
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
-
-                <SidebarGroup className="mt-auto">
-                    <SidebarGroupLabel className="text-[10px] uppercase tracking-widest font-black text-muted-foreground/60 px-6 mb-2">Ajustes</SidebarGroupLabel>
-                    <SidebarGroupContent>
-                        <SidebarMenu className="px-3 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-2">
-                            {configItems.map((item) => (
-                                <SidebarMenuItem key={item.title}>
-                                    <SidebarMenuButton
-                                        asChild
-                                        isActive={pathname === item.url}
-                                        tooltip={item.title}
-                                        className="h-10 rounded-lg hover:bg-brand-1/10 hover:text-brand-1 transition-all group text-sidebar-foreground"
-                                    >
-                                        <Link
-                                            href={item.url}
-                                            className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
-                                        >
-                                            <item.icon className="h-4 w-4 group-hover:scale-110 transition-transform" />
-                                            <span className="font-semibold text-sm tracking-tight group-data-[collapsible=icon]:hidden">
-                                                {item.title}
-                                            </span>
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            ))}
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
+            <SidebarContent className="px-1">
+                <NavGroup label="Menu principal" items={MAIN_NAV} />
+                <div className="mt-auto">
+                    <NavGroup label="Ajustes" items={SETTINGS_NAV} />
+                </div>
             </SidebarContent>
-            <SidebarFooter className="border-t border-border p-4 group-data-[collapsible=icon]:p-2">
-                <SidebarMenu className="group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-2">
+            <SidebarFooter className="border-t p-3 pb-safe">
+                <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             onClick={logout}
-                            className="w-full h-10 rounded-lg justify-start gap-3 text-rose-500/70 hover:text-rose-500 hover:bg-rose-500/10 transition-all font-semibold tracking-tight cursor-pointer group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
+                            tooltip="Sair"
+                            className="h-10 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
                         >
-                            <LogOut className="h-4 w-4" />
-                            <span className="group-data-[collapsible=icon]:hidden">Sair</span>
+                            <LogOut />
+                            <span>Sair</span>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>

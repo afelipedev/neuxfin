@@ -12,7 +12,12 @@ import {
 import { TransactionForm } from "./transaction-form"
 
 /** Botão "Nova transação" que pergunta se é receita ou despesa antes de abrir o formulário. */
-export function NewTransactionMenu({ className }: { className?: string }) {
+export function NewTransactionMenu({ className, trigger, align = "end" }: {
+    className?: string
+    /** Gatilho customizado (ex.: botão central da navegação mobile) */
+    trigger?: React.ReactNode
+    align?: "start" | "center" | "end"
+}) {
     const [type, setType] = React.useState<"receita" | "despesa">("despesa")
     const [open, setOpen] = React.useState(false)
 
@@ -25,19 +30,21 @@ export function NewTransactionMenu({ className }: { className?: string }) {
         <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button className={className}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Nova Transação
-                        <ChevronDown className="ml-2 h-3 w-3" />
-                    </Button>
+                    {trigger ?? (
+                        <Button className={className}>
+                            <Plus />
+                            Nova transação
+                            <ChevronDown className="h-3 w-3" />
+                        </Button>
+                    )}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuContent align={align} className="w-48">
                     <DropdownMenuItem onSelect={() => openFor("receita")}>
-                        <ArrowUpCircle className="h-4 w-4 text-brand-2" />
+                        <ArrowUpCircle className="h-4 w-4 text-success" />
                         Receita
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => openFor("despesa")}>
-                        <ArrowDownCircle className="h-4 w-4 text-rose-500" />
+                        <ArrowDownCircle className="h-4 w-4 text-destructive" />
                         Despesa
                     </DropdownMenuItem>
                 </DropdownMenuContent>

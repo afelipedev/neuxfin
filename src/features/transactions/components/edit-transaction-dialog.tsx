@@ -26,6 +26,7 @@ import { Transaction, buildStatusUpdate } from "../services/transactions"
 import { useCategories } from "@/features/settings/hooks/use-categories"
 import { BankAccount, settingsService } from "@/features/settings/services/settings-service"
 import { todayISO } from "@/features/bank-accounts/services/balances"
+import { DatePicker } from "@/components/ds"
 
 interface EditTransactionDialogProps {
     transaction: Transaction
@@ -126,15 +127,15 @@ export function EditTransactionDialog({ transaction, onSuccess, trigger, open: o
             {(!isControlled || trigger) && (
                 <DialogTrigger asChild>
                     {trigger || (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" aria-label="Editar transação">
-                            <Edit className="h-3.5 w-3.5" />
+                        <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label="Editar transação">
+                            <Edit />
                         </Button>
                     )}
                 </DialogTrigger>
             )}
-            <DialogContent className="max-w-md">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Editar Transação</DialogTitle>
+                    <DialogTitle>Editar transação</DialogTitle>
                     <DialogDescription>
                         Atualize as informações da transação
                     </DialogDescription>
@@ -226,15 +227,13 @@ export function EditTransactionDialog({ transaction, onSuccess, trigger, open: o
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="data_vencimento">Data de Vencimento</Label>
-                            <Input
+                            <Label htmlFor="data_vencimento">Vencimento</Label>
+                            <DatePicker
                                 id="data_vencimento"
-                                type="date"
                                 value={formData.data_vencimento}
-                                onChange={(e) => setFormData({ ...formData, data_vencimento: e.target.value })}
-                                required
+                                onChange={(iso) => setFormData({ ...formData, data_vencimento: iso })}
                             />
                         </div>
 
@@ -259,12 +258,10 @@ export function EditTransactionDialog({ transaction, onSuccess, trigger, open: o
                             <Label htmlFor="data_pagamento">
                                 Data do {transaction.tipo_transacao === 'receita' ? 'recebimento' : 'pagamento'}
                             </Label>
-                            <Input
+                            <DatePicker
                                 id="data_pagamento"
-                                type="date"
                                 value={formData.data_pagamento}
-                                onChange={(e) => setFormData({ ...formData, data_pagamento: e.target.value })}
-                                required
+                                onChange={(iso) => setFormData({ ...formData, data_pagamento: iso })}
                             />
                         </div>
                     )}
@@ -276,7 +273,7 @@ export function EditTransactionDialog({ transaction, onSuccess, trigger, open: o
                     )}
 
                     {isPaid && formData.conta_id === NO_ACCOUNT && !isCardPurchase && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                        <p className="text-xs text-warning">
                             Sem conta vinculada, este lançamento não altera o saldo de nenhuma conta.
                         </p>
                     )}

@@ -4,6 +4,7 @@ import { DataTablePagination, usePaginatedList } from "@/components/data-table-p
 import * as React from "react"
 import { Plus, Trash2, Edit, ArrowUpRight, ArrowDownRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ToneBadge } from "@/components/ds"
 import { Card, CardContent } from "@/components/ui/card"
 import {
     Table,
@@ -13,7 +14,6 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -133,11 +133,11 @@ export function CategoriesSettings() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-bold">Gerenciar Categorias</h2>
+                    <h2 className="text-lg font-semibold">Gerenciar Categorias</h2>
                     <p className="text-sm text-muted-foreground">Adicione ou remova categorias para suas transações</p>
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <Button onClick={openCreateDialog} className="bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold w-full sm:w-auto justify-center">
+                    <Button onClick={openCreateDialog} className="w-full sm:w-auto justify-center">
                         <Plus className="mr-2 h-4 w-4" /> Nova Categoria
                     </Button>
                     <DialogContent>
@@ -187,7 +187,7 @@ export function CategoriesSettings() {
                                     />
                                 </div>
                             </div>
-                            <Button type="submit" disabled={saving} className="w-full bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold">
+                            <Button type="submit" disabled={saving} className="w-full">
                                 {saving ? "Salvando..." : editingCategory ? "Atualizar Categoria" : "Salvar Categoria"}
                             </Button>
                         </form>
@@ -195,15 +195,15 @@ export function CategoriesSettings() {
                 </Dialog>
             </div>
 
-            <Card className="border-none bg-zinc-900/5 dark:bg-zinc-100/5 shadow-none overflow-hidden">
+            <Card className="gap-0 overflow-hidden py-0">
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="font-medium text-xs h-10 px-6">Categoria</TableHead>
-                                <TableHead className="font-medium text-xs h-10">Tipo</TableHead>
-                                <TableHead className="font-medium text-xs h-10">Cor</TableHead>
-                                <TableHead className="font-medium text-xs h-10 text-right px-6">Ações</TableHead>
+                                <TableHead className="px-6">Categoria</TableHead>
+                                <TableHead >Tipo</TableHead>
+                                <TableHead >Cor</TableHead>
+                                <TableHead className="text-right px-6">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -221,7 +221,7 @@ export function CategoriesSettings() {
                                 </TableRow>
                             ) : (
                                 paged.pageItems.map((category) => (
-                                    <TableRow key={category.id} className="border-neux-1/5 hover:bg-zinc-900/5 dark:hover:bg-zinc-100/5 transition-colors">
+                                    <TableRow key={category.id} className="border-border hover:bg-muted transition-colors">
                                         <TableCell className="font-medium px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div
@@ -232,21 +232,16 @@ export function CategoriesSettings() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge
-                                                className={`border-none text-[10px] h-5 ${category.tipo === "receita"
-                                                    ? "bg-emerald-500/20 text-emerald-600"
-                                                    : "bg-rose-500/20 text-rose-600"
-                                                    }`}
-                                            >
+                                            <ToneBadge tone={category.tipo === "receita" ? "success" : "danger"}>
                                                 {category.tipo === "receita" ? (
-                                                    <><ArrowUpRight className="mr-1 h-3 w-3" /> Receita</>
+                                                    <><ArrowUpRight /> Receita</>
                                                 ) : (
-                                                    <><ArrowDownRight className="mr-1 h-3 w-3" /> Despesa</>
+                                                    <><ArrowDownRight /> Despesa</>
                                                 )}
-                                            </Badge>
+                                            </ToneBadge>
                                         </TableCell>
                                         <TableCell>
-                                            <code className="text-[10px] bg-zinc-900/5 dark:bg-zinc-100/10 px-2 py-1 rounded">
+                                            <code className="rounded bg-muted px-2 py-1 font-mono text-xs">
                                                 {category.cor}
                                             </code>
                                         </TableCell>
@@ -254,19 +249,21 @@ export function CategoriesSettings() {
                                             <div className="flex justify-end gap-1">
                                                 <Button
                                                     variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7 text-muted-foreground"
+                                                    size="icon-sm"
+                                                    className="text-muted-foreground"
                                                     onClick={() => openEditDialog(category)}
+                                                    aria-label={`Editar ${category.nome}`}
                                                 >
-                                                    <Edit className="h-3.5 w-3.5" />
+                                                    <Edit />
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7 text-rose-500"
+                                                    size="icon-sm"
+                                                    className="text-destructive"
                                                     onClick={() => setDeletingId(category.id)}
+                                                    aria-label={`Excluir ${category.nome}`}
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                    <Trash2 />
                                                 </Button>
                                             </div>
                                         </TableCell>
@@ -301,13 +298,13 @@ export function CategoriesSettings() {
                                 e.preventDefault()
                                 handleDelete()
                             }}
-                            className="bg-rose-500 hover:bg-rose-600 text-white"
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             Excluir
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div >
+        </div>
     )
 }

@@ -32,8 +32,8 @@ export function ExportTransactionsButton({ filters, fileName, label = "Exportar 
     }
 
     return (
-        <Button variant="ghost" size="sm" onClick={handleClick} disabled={exporting} className={className}>
-            <Download className="mr-2 h-4 w-4" /> {exporting ? "Exportando..." : label}
+        <Button variant="outline" onClick={handleClick} disabled={exporting} className={className}>
+            <Download /> {exporting ? "Exportando..." : label}
         </Button>
     )
 }

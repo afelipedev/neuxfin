@@ -7,7 +7,7 @@ export function RecurrenceBadge({ transaction }: { transaction: Pick<Transaction
     const label = transaction.assinatura_id ? "Assinatura" : "Recorrente"
     return (
         <span
-            className="ml-2 inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground"
+            className="ml-2 inline-flex items-center gap-1 text-2xs font-semibold text-muted-foreground"
             title={transaction.assinatura_id ? "Gerada automaticamente pela assinatura" : "Faz parte de uma série mensal"}
         >
             <Repeat className="h-3 w-3" aria-hidden="true" />

@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { LogOut, Settings, Sparkles, User } from "lucide-react"
+import { LogOut, Moon, Settings, Sparkles, Sun, User } from "lucide-react"
+import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
     DropdownMenu,
@@ -34,6 +35,8 @@ export function initialsOf(nome: string, email = ""): string {
 export function HeaderUserMenu() {
     const [profile, setProfile] = React.useState<ProfileSummary | null>(null)
     const { logout } = useAuth()
+    const { resolvedTheme, setTheme } = useTheme()
+    const isDark = resolvedTheme === "dark"
 
     React.useEffect(() => {
         let cancelled = false
@@ -61,12 +64,12 @@ export function HeaderUserMenu() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger
-                className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand-1/60 transition-transform hover:scale-105"
+                className="ml-1 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring/60 pointer-coarse:p-1"
                 aria-label="Menu da conta"
             >
-                <Avatar className="h-9 w-9 rounded-xl border border-white/10 shadow-lg shadow-brand-1/10">
+                <Avatar className="h-9 w-9 rounded-xl border">
                     {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt="" className="object-cover" />}
-                    <AvatarFallback className="rounded-xl bg-gradient-to-tr from-brand-1 to-brand-3 text-zinc-950 text-xs font-black font-display">
+                    <AvatarFallback className="rounded-xl bg-primary text-primary-foreground text-xs font-bold font-display">
                         {profile ? initialsOf(profile.nome, profile.email) : ""}
                     </AvatarFallback>
                 </Avatar>
@@ -88,8 +91,12 @@ export function HeaderUserMenu() {
                 <DropdownMenuItem asChild>
                     <Link href="/configuracoes?tab=ia"><Sparkles className="mr-2 h-4 w-4" />Modelos de IA</Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setTheme(isDark ? "light" : "dark")}>
+                    {isDark ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                    {isDark ? "Tema claro" : "Tema escuro"}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => { void logout() }} className="text-rose-600 focus:text-rose-600 dark:text-rose-400">
+                <DropdownMenuItem onSelect={() => { void logout() }} className="text-destructive focus:text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />Sair
                 </DropdownMenuItem>
             </DropdownMenuContent>

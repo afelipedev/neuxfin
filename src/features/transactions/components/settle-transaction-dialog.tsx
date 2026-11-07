@@ -12,7 +12,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
     Select,
@@ -26,6 +25,7 @@ import { Transaction } from "../services/transactions"
 import { BankAccount, settingsService } from "@/features/settings/services/settings-service"
 import { todayISO } from "@/features/bank-accounts/services/balances"
 import { formatCurrency } from "@/lib/utils"
+import { DatePicker } from "@/components/ds"
 
 type SettleTarget = Pick<Transaction, 'id' | 'status' | 'tipo_transacao' | 'descricao'> & {
     valor: number | string
@@ -63,8 +63,8 @@ export function SettleTransactionDialog({ transaction, onSuccess }: SettleTransa
         return (
             <Button
                 variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground"
+                size="icon-sm"
+                className="text-muted-foreground"
                 title={isReceita ? "Desfazer recebimento" : "Desfazer pagamento"}
                 aria-label={isReceita ? "Desfazer recebimento" : "Desfazer pagamento"}
                 disabled={loading}
@@ -72,7 +72,7 @@ export function SettleTransactionDialog({ transaction, onSuccess }: SettleTransa
                     if (await updateStatus(transaction.id, 'pendente')) onSuccess?.()
                 }}
             >
-                <RotateCcw className="h-3.5 w-3.5" />
+                <RotateCcw />
             </Button>
         )
     }
@@ -92,15 +92,15 @@ export function SettleTransactionDialog({ transaction, onSuccess }: SettleTransa
             <DialogTrigger asChild>
                 <Button
                     variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
+                    size="icon-sm"
+                    className="text-success hover:text-success"
                     title={`Marcar como ${isReceita ? 'recebida' : 'paga'}`}
                     aria-label={`Marcar como ${isReceita ? 'recebida' : 'paga'}`}
                 >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <CheckCircle2 />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-sm">
+            <DialogContent className="sm:max-w-sm">
                 <DialogHeader>
                     <DialogTitle>{verb} lançamento</DialogTitle>
                     <DialogDescription>
@@ -110,13 +110,7 @@ export function SettleTransactionDialog({ transaction, onSuccess }: SettleTransa
                 <form onSubmit={handleConfirm} className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="settle-date">Data do {isReceita ? 'recebimento' : 'pagamento'}</Label>
-                        <Input
-                            id="settle-date"
-                            type="date"
-                            value={dataPagamento}
-                            onChange={(e) => setDataPagamento(e.target.value)}
-                            required
-                        />
+                        <DatePicker id="settle-date" value={dataPagamento} onChange={setDataPagamento} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="settle-account">Conta {isReceita ? 'de destino' : 'de saída'}</Label>

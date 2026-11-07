@@ -84,14 +84,14 @@ export function ReplicateDialog({ transactions, onSuccess }: ReplicateDialogProp
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="bg-zinc-900/5 dark:bg-zinc-100/5 border-none">
-                    <Copy className="mr-2 h-4 w-4" />
-                    Replicar Transações
+                <Button variant="outline">
+                    <Copy />
+                    Replicar
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Replicar Transações</DialogTitle>
+                    <DialogTitle>Replicar transações</DialogTitle>
                     <DialogDescription>
                         Selecione as transações e os meses para os quais deseja replicá-las
                     </DialogDescription>
@@ -101,7 +101,7 @@ export function ReplicateDialog({ transactions, onSuccess }: ReplicateDialogProp
                     {/* Seleção de Transações */}
                     <div className="space-y-3">
                         <Label className="text-sm font-semibold">Transações a Replicar</Label>
-                        <div className="border rounded-lg p-4 space-y-2 max-h-[200px] overflow-y-auto bg-zinc-900/5 dark:bg-zinc-100/5">
+                        <div className="border rounded-lg p-4 space-y-2 max-h-[200px] overflow-y-auto bg-muted">
                             {transactions.length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center py-4">
                                     Nenhuma transação disponível
@@ -148,7 +148,7 @@ export function ReplicateDialog({ transactions, onSuccess }: ReplicateDialogProp
                     {/* Seleção de Meses */}
                     <div className="space-y-3">
                         <Label className="text-sm font-semibold">Meses de Destino</Label>
-                        <div className="border rounded-lg p-4 grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto bg-zinc-900/5 dark:bg-zinc-100/5">
+                        <div className="border rounded-lg p-4 grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto bg-muted">
                             {nextMonths.map(({ month, year, label }) => (
                                 <div key={`${year}-${month}`} className="flex items-center space-x-2">
                                     <Checkbox
@@ -169,8 +169,8 @@ export function ReplicateDialog({ transactions, onSuccess }: ReplicateDialogProp
 
                     {/* Resumo */}
                     {(selectedTransactions.length > 0 || selectedMonths.length > 0) && (
-                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                            <p className="text-sm text-blue-600 dark:text-blue-400">
+                        <div className="bg-info/10 border border-info/20 rounded-lg p-4">
+                            <p className="text-sm text-info">
                                 <strong>{selectedTransactions.length}</strong> transação(ões) será(ão) replicada(s) para{' '}
                                 <strong>{selectedMonths.length}</strong> mês(es), criando{' '}
                                 <strong>{selectedTransactions.length * selectedMonths.length}</strong> nova(s) transação(ões).

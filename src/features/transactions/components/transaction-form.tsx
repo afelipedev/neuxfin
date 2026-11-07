@@ -4,7 +4,7 @@ import * as React from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { CalendarIcon, CreditCard, Landmark, Plus } from "lucide-react"
+import { CreditCard, Landmark, Plus } from "lucide-react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
@@ -35,10 +35,9 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
+import { DatePicker } from "@/components/ds"
 import { Checkbox } from "@/components/ui/checkbox"
-import { cn, formatDateToISO, parseLocalDate } from "@/lib/utils"
+import { formatDateToISO, parseLocalDate } from "@/lib/utils"
 import { useTransactionActions } from "../hooks/use-transactions"
 import { createClient } from "@/lib/supabase/client"
 import { type CardInfo, invoiceDates, invoiceKeyForDate } from "@/features/credit-cards/services/invoices"
@@ -226,7 +225,6 @@ export function TransactionForm({ type, onSuccess, trigger, open: openProp, onOp
         toast.error(field ? `${FIELD_LABELS[field] ?? field}: ${message}` : message)
     }
 
-    const [dateOpen, setDateOpen] = React.useState(false)
     const showTrigger = !isControlled || trigger
 
     return (
@@ -234,16 +232,13 @@ export function TransactionForm({ type, onSuccess, trigger, open: openProp, onOp
             {showTrigger && (
                 <DialogTrigger asChild>
                     {trigger || (
-                        <Button className={cn(
-                            "text-white",
-                            type === "receita" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
-                        )}>
-                            <Plus className="mr-2 h-4 w-4" /> Nova {type.charAt(0).toUpperCase() + type.slice(1)}
+                        <Button>
+                            <Plus /> Nova {type}
                         </Button>
                     )}
                 </DialogTrigger>
             )}
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[520px]">
                 <DialogHeader>
                     <DialogTitle>Cadastrar {type}</DialogTitle>
                     <DialogDescription>
@@ -443,44 +438,12 @@ export function TransactionForm({ type, onSuccess, trigger, open: openProp, onOp
                             render={({ field }) => (
                                 <FormItem className="flex flex-col">
                                     <FormLabel>{isCartao ? "Data da compra" : "Data"}</FormLabel>
-                                    <Popover open={dateOpen} onOpenChange={setDateOpen}>
-                                        <PopoverTrigger asChild>
-                                            <FormControl>
-                                                <Button
-                                                    type="button"
-                                                    variant={"outline"}
-                                                    className={cn(
-                                                        "w-full pl-3 text-left font-normal",
-                                                        !field.value && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    {field.value ? (
-                                                        format(field.value, "PPP", { locale: ptBR })
-                                                    ) : (
-                                                        <span>Selecione uma data</span>
-                                                    )}
-                                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                </Button>
-                                            </FormControl>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar
-                                                mode="single"
-                                                required
-                                                selected={field.value}
-                                                onSelect={(date) => {
-                                                    // Clicar no dia já selecionado não deve apagar a data
-                                                    if (date) field.onChange(date)
-                                                    setDateOpen(false)
-                                                }}
-                                                disabled={(date) =>
-                                                    date < new Date("1900-01-01")
-                                                }
-                                                initialFocus
-                                                locale={ptBR}
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
+                                    <FormControl>
+                                        <DatePicker
+                                            value={field.value ? formatDateToISO(field.value) : ""}
+                                            onChange={(iso) => field.onChange(parseLocalDate(iso))}
+                                        />
+                                    </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -590,11 +553,7 @@ export function TransactionForm({ type, onSuccess, trigger, open: openProp, onOp
                             <Button
                                 type="submit"
                                 disabled={loading}
-                                className={cn(
-                                    "text-white",
-                                    type === "receita" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700",
-                                    "w-full sm:w-auto"
-                                )}
+                                className="w-full sm:w-auto"
                             >
                                 {loading ? 'Salvando...' : 'Salvar'}
                             </Button>

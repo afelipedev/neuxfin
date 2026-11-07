@@ -4,6 +4,7 @@ import { DataTablePagination, usePaginatedList } from "@/components/data-table-p
 import * as React from "react"
 import { Plus, Landmark, Trash2, Edit, Wallet, Banknote, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ToneBadge } from "@/components/ds"
 import { Card, CardContent } from "@/components/ui/card"
 import {
     Table,
@@ -40,6 +41,7 @@ import { createClient } from "@/lib/supabase/client"
 import { formatCurrency } from "@/lib/utils"
 import Link from "next/link"
 import { toast } from "sonner"
+import { DatePicker } from "@/components/ds"
 
 const EMPTY_FORM = {
     nome: "",
@@ -180,11 +182,11 @@ export function AccountsSettings() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-bold">Contas Bancárias</h2>
+                    <h2 className="text-lg font-semibold">Contas Bancárias</h2>
                     <p className="text-sm text-muted-foreground">Gerencie seus bancos, carteiras e investimentos</p>
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <Button onClick={openCreateDialog} className="bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold w-full sm:w-auto justify-center">
+                    <Button onClick={openCreateDialog} className="w-full sm:w-auto justify-center">
                         <Plus className="mr-2 h-4 w-4" /> Nova Conta
                     </Button>
                     <DialogContent>
@@ -245,13 +247,14 @@ export function AccountsSettings() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="data_saldo">Saldo em (opcional)</Label>
-                                    <Input
+                                    <DatePicker
                                         id="data_saldo"
-                                        type="date"
+                                        clearable
+                                        placeholder="Desde sempre"
                                         value={formData.data_saldo_inicial}
-                                        onChange={(e) => setFormData({ ...formData, data_saldo_inicial: e.target.value })}
+                                        onChange={(iso) => setFormData({ ...formData, data_saldo_inicial: iso })}
                                     />
-                                    <p className="text-[10px] text-muted-foreground">
+                                    <p className="text-xs text-muted-foreground">
                                         Lançamentos anteriores a esta data já estão no saldo inicial e não serão somados.
                                     </p>
                                 </div>
@@ -273,7 +276,7 @@ export function AccountsSettings() {
                                     </div>
                                 </div>
                             </div>
-                            <Button type="submit" disabled={saving} className="w-full bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold">
+                            <Button type="submit" disabled={saving} className="w-full">
                                 {saving ? "Salvando..." : editingAccount ? "Atualizar Conta" : "Salvar Conta"}
                             </Button>
                         </form>
@@ -281,16 +284,16 @@ export function AccountsSettings() {
                 </Dialog>
             </div>
 
-            <Card className="border-none bg-zinc-900/5 dark:bg-zinc-100/5 shadow-none overflow-hidden">
+            <Card className="gap-0 overflow-hidden py-0">
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="font-medium text-xs h-10 px-6">Nome / Instituição</TableHead>
-                                <TableHead className="font-medium text-xs h-10">Tipo</TableHead>
-                                <TableHead className="font-medium text-xs h-10 text-right hidden sm:table-cell">Saldo Inicial</TableHead>
-                                <TableHead className="font-medium text-xs h-10 text-right">Saldo Atual</TableHead>
-                                <TableHead className="font-medium text-xs h-10 text-right px-6">Ações</TableHead>
+                                <TableHead className="px-6">Nome / Instituição</TableHead>
+                                <TableHead >Tipo</TableHead>
+                                <TableHead className="text-right hidden sm:table-cell">Saldo Inicial</TableHead>
+                                <TableHead className="text-right">Saldo Atual</TableHead>
+                                <TableHead className="text-right px-6">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -308,7 +311,7 @@ export function AccountsSettings() {
                                 </TableRow>
                             ) : (
                                 paged.pageItems.map((account) => (
-                                    <TableRow key={account.id} className="border-neux-1/5 hover:bg-zinc-900/5 dark:hover:bg-zinc-100/5 transition-colors">
+                                    <TableRow key={account.id} className="border-border hover:bg-muted transition-colors">
                                         <TableCell className="font-medium px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div
@@ -318,26 +321,26 @@ export function AccountsSettings() {
                                                     {getIcon(account.tipo)}
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold flex items-center gap-2">
+                                                    <div className="flex items-center gap-2 font-medium">
                                                         {account.nome}
                                                         {account.padrao && (
-                                                            <Badge className="bg-brand-1/10 text-brand-1 border-none text-[9px] h-4 px-1.5 uppercase">Padrão</Badge>
+                                                            <ToneBadge tone="brand">Padrão</ToneBadge>
                                                         )}
                                                     </div>
-                                                    <div className="text-[10px] text-muted-foreground uppercase">{account.instituicao || "Geral"}</div>
+                                                    <div className="text-xs text-muted-foreground">{account.instituicao || "Geral"}</div>
                                                 </div>
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="outline" className="border-border text-[10px] uppercase font-bold">
+                                            <Badge variant="outline" className="capitalize">
                                                 {account.tipo}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-right font-mono text-muted-foreground hidden sm:table-cell">
+                                        <TableCell className="text-right tabular-nums text-muted-foreground hidden sm:table-cell">
                                             {formatCurrency(Number(account.saldo_inicial))}
                                         </TableCell>
-                                        <TableCell className="text-right font-mono font-bold">
-                                            <Link href={`/contas/${account.id}`} className={account.saldo_atual < 0 ? "text-rose-500 hover:underline" : "hover:underline"}>
+                                        <TableCell className="text-right font-semibold tabular-nums">
+                                            <Link href={`/contas/${account.id}`} className={account.saldo_atual < 0 ? "text-destructive hover:underline" : "hover:underline"}>
                                                 {formatCurrency(account.saldo_atual)}
                                             </Link>
                                         </TableCell>
@@ -345,30 +348,32 @@ export function AccountsSettings() {
                                             <div className="flex justify-end gap-1">
                                                 <Button
                                                     variant="ghost"
-                                                    size="icon"
-                                                    className={account.padrao ? "h-7 w-7 text-amber-500" : "h-7 w-7 text-muted-foreground"}
+                                                    size="icon-sm"
+                                                    className={account.padrao ? "text-warning" : "text-muted-foreground"}
                                                     onClick={() => handleToggleDefault(account)}
                                                     aria-label={account.padrao ? "Remover como conta padrão" : "Definir como conta padrão"}
                                                     aria-pressed={account.padrao}
                                                     title={account.padrao ? "Conta padrão (usada pela IA e pelo WhatsApp)" : "Definir como conta padrão"}
                                                 >
-                                                    <Star className="h-3.5 w-3.5" fill={account.padrao ? "currentColor" : "none"} />
+                                                    <Star fill={account.padrao ? "currentColor" : "none"} />
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7 text-muted-foreground"
+                                                    size="icon-sm"
+                                                    className="text-muted-foreground"
                                                     onClick={() => openEditDialog(account)}
+                                                    aria-label={`Editar ${account.nome}`}
                                                 >
-                                                    <Edit className="h-3.5 w-3.5" />
+                                                    <Edit />
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7 text-rose-500"
+                                                    size="icon-sm"
+                                                    className="text-destructive"
                                                     onClick={() => setDeletingId(account.id)}
+                                                    aria-label={`Excluir ${account.nome}`}
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                    <Trash2 />
                                                 </Button>
                                             </div>
                                         </TableCell>
@@ -403,13 +408,13 @@ export function AccountsSettings() {
                                 e.preventDefault()
                                 handleDelete()
                             }}
-                            className="bg-rose-500 hover:bg-rose-600 text-white"
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             Excluir
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div >
+        </div>
     )
 }

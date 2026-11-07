@@ -1,8 +1,31 @@
 "use client"
 
 import * as React from "react"
-import { Plus, Download, ChevronRight, ArrowUpCircle, ArrowDownCircle } from "lucide-react"
+import Link from "next/link"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { ArrowDownCircle, ArrowUpCircle, ChevronRight, Download, Inbox } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table"
+import {
+    Amount,
+    EmptyState,
+    IconTile,
+    MonthStepper,
+    PageHeader,
+    ProfileBadge,
+    SectionCard,
+    TransactionStatusBadge,
+} from "@/components/ds"
 import {
     SummaryCards,
     QuickBalanceDetail,
@@ -12,25 +35,13 @@ import {
 import { useDashboardAlerts } from "@/features/dashboard/hooks/use-dashboard-alerts"
 import { NewTransactionMenu } from "@/features/transactions/components/new-transaction-menu"
 import { exportTransactionsXlsx } from "@/features/transactions/services/export"
-import { toast } from "sonner"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
 import { CashFlowChart } from "@/features/dashboard/components/cash-flow-chart"
 import { useTransactions, useDashboardStats, useCashFlowData } from "@/features/transactions/hooks/use-transactions"
-import { TransactionForm } from "@/features/transactions/components/transaction-form"
 import { AllTransactionsModal } from "@/features/transactions/components/all-transactions-modal"
 import { BankAccountsBalance } from "@/features/bank-accounts/components/bank-accounts-balance"
+import { deriveStatus } from "@/features/bank-accounts/services/balances"
 import { DataTablePagination } from "@/components/data-table-pagination"
-import { format } from "date-fns"
-import { ptBR } from "date-fns/locale"
-import { cn, parseLocalDate, formatCurrency } from "@/lib/utils"
+import { getErrorMessage, parseLocalDate } from "@/lib/utils"
 
 export default function DashboardPage() {
     const [month, setMonth] = React.useState(new Date().getMonth() + 1)
@@ -38,27 +49,16 @@ export default function DashboardPage() {
     const [page, setPage] = React.useState(1)
     const [pageSize, setPageSize] = React.useState(10)
 
-    React.useEffect(() => {
+    const changeMonth = (m: number, y: number) => {
+        setMonth(m)
+        setYear(y)
         setPage(1)
-    }, [month, year])
-
-    // Navega entre meses ajustando o ano na virada (Dez → Jan / Jan → Dez)
-    const shiftMonth = (delta: number) => {
-        const target = new Date(year, month - 1 + delta, 1)
-        setMonth(target.getMonth() + 1)
-        setYear(target.getFullYear())
     }
 
-    const filters = React.useMemo(() => ({
-        month,
-        year,
-        page,
-        pageSize
-    }), [month, year, page, pageSize])
+    const filters = React.useMemo(() => ({ month, year, page, pageSize }), [month, year, page, pageSize])
     const { transactions, totalCount, loading: loadingTransactions } = useTransactions(filters)
     const { stats, loading: loadingStats } = useDashboardStats(filters)
     const { data: cashFlowData, loading: loadingCashFlow } = useCashFlowData(12, true)
-
 
     // Alerta de saldo previsto negativo só faz sentido para o mês corrente
     const isCurrentMonth = month === new Date().getMonth() + 1 && year === new Date().getFullYear()
@@ -72,218 +72,159 @@ export default function DashboardPage() {
             setExporting(true)
             const total = await exportTransactionsXlsx(
                 { month, year },
-                `transacoes_${year}_${String(month).padStart(2, '0')}`
+                `transacoes_${year}_${String(month).padStart(2, "0")}`
             )
             toast.success(`${total} transação(ões) exportada(s)`)
-        } catch (err) {
-            console.error(err)
-            toast.error("Erro ao exportar transações")
+        } catch (e) {
+            toast.error(`Erro ao exportar transações: ${getErrorMessage(e)}`)
         } finally {
             setExporting(false)
         }
     }
 
-
-
     return (
-        <div className="flex flex-col lg:grid lg:grid-cols-12 gap-8 max-w-[1600px] mx-auto pb-12">
-            {/* Main Content Area */}
-            <div className="lg:col-span-8 space-y-8">
-                {/* Header Section */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                        <h1 className="text-4xl font-black tracking-tighter font-display text-foreground">Dashboard</h1>
-                        <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-black">Visão geral da sua saúde financeira</p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
-                        <div className="flex items-center bg-secondary/30 dark:bg-zinc-100/5 rounded-xl border border-border px-2 w-full sm:w-auto">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-[10px] uppercase font-black tracking-widest"
-                                onClick={() => shiftMonth(-1)}
-                                aria-label="Mês anterior"
-                            >
-                                <ChevronRight className="h-3 w-3 rotate-180" />
-                            </Button>
-                            <span className="text-[10px] uppercase font-black tracking-widest px-2 min-w-[100px] text-center">
-                                {format(new Date(year, month - 1), 'MMMM yyyy', { locale: ptBR })}
-                            </span>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-[10px] uppercase font-black tracking-widest"
-                                onClick={() => shiftMonth(1)}
-                                aria-label="Próximo mês"
-                            >
-                                <ChevronRight className="h-3 w-3" />
-                            </Button>
-                        </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleExport}
-                            disabled={exporting}
-                            className="hidden md:flex bg-secondary/50 dark:bg-zinc-100/5 border border-border h-10 px-4 rounded-xl text-[10px] uppercase font-black tracking-widest hover:bg-brand-1 hover:text-zinc-950 transition-all font-display text-foreground"
-                        >
-                            <Download className="mr-2 h-3 w-3" />
-                            {exporting ? "Exportando..." : "Exportar"}
-                        </Button>
-                        <NewTransactionMenu className="bg-brand-1 hover:bg-brand-2 text-zinc-950 shadow-xl shadow-brand-1/10 h-10 px-6 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all hover:scale-105 active:scale-95 font-display border-none w-full sm:w-auto" />
-                    </div>
-                </div>
+        <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
+            <div className="min-w-0 space-y-6 lg:col-span-8 lg:space-y-8">
+                <PageHeader
+                    title="Dashboard"
+                    description="Visão geral da sua saúde financeira"
+                    actions={
+                        <>
+                            <MonthStepper month={month} year={year} onChange={changeMonth} />
+                            <NewTransactionMenu className="hidden md:inline-flex" />
+                        </>
+                    }
+                />
 
-                {/* Info Cards Grid */}
                 <SummaryCards stats={stats} loading={loadingStats} />
 
-                {/* Cash Flow Section */}
-                <Card className="border-none glass-card shadow-none overflow-hidden rounded-3xl group transition-all duration-300">
-                    <CardHeader className="flex flex-row items-center justify-between p-6">
-                        <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest transition-colors">Fluxo de Caixa Mensal</CardTitle>
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <div className="h-2 w-2 rounded-full bg-brand-1 animate-pulse" />
-                                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Receitas</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <div className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Despesas</span>
-                            </div>
+                <SectionCard
+                    title="Fluxo de caixa mensal"
+                    description="Últimos 12 meses, por competência"
+                    actions={
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-chart-1" aria-hidden="true" />Receitas</span>
+                            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-chart-5" aria-hidden="true" />Despesas</span>
                         </div>
-                    </CardHeader>
-                    <CardContent className="h-[260px] sm:h-[320px] lg:h-[400px] px-2 pb-6">
-                        <CashFlowChart data={cashFlowData} loading={loadingCashFlow} />
-                    </CardContent>
-                </Card>
+                    }
+                    contentClassName="h-[240px] px-2 sm:h-[320px] sm:px-4 lg:h-[360px]"
+                >
+                    <CashFlowChart data={cashFlowData} loading={loadingCashFlow} />
+                </SectionCard>
 
-                {/* Recent Transactions Table */}
-                <Card className="border-none glass-card shadow-none overflow-hidden rounded-3xl transition-all duration-300">
-                    <CardHeader className="flex flex-row items-center justify-between p-6 pb-2">
-                        <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Últimas Movimentações</CardTitle>
-                        <div className="flex gap-2 text-xs">
-                            <Button variant="ghost" size="sm" onClick={handleExport} disabled={exporting} className="text-[10px] uppercase font-black tracking-widest text-muted-foreground hover:text-brand-1 transition-colors cursor-pointer active:scale-95">
-                                <Download className="mr-2 h-3 w-3" /> Exportar
+                <SectionCard
+                    flush
+                    className="pb-0"
+                    title="Últimas movimentações"
+                    actions={
+                        <>
+                            <Button variant="ghost" size="sm" onClick={handleExport} disabled={exporting}>
+                                <Download /> {exporting ? "Exportando..." : "Exportar"}
                             </Button>
                             <AllTransactionsModal
                                 initialMonth={month}
                                 initialYear={year}
                                 trigger={
-                                    <Button variant="ghost" size="sm" className="text-[10px] uppercase font-black tracking-widest text-brand-1 hover:scale-105 transition-all cursor-pointer active:scale-95">
-                                        Ver todas <ChevronRight className="ml-1 h-3 w-3" />
+                                    <Button variant="ghost" size="sm" className="text-brand-1 hover:text-brand-1">
+                                        Ver todas <ChevronRight />
                                     </Button>
                                 }
                             />
+                        </>
+                    }
+                >
+                    {loadingTransactions ? (
+                        <div className="space-y-3 px-4 pb-5 sm:px-6">
+                            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-12" />)}
                         </div>
-                    </CardHeader>
-                    <CardContent className="px-0 pt-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="font-black text-[10px] uppercase tracking-widest h-12 px-6">Descrição</TableHead>
-                                    <TableHead className="font-black text-[10px] uppercase tracking-widest h-12 hidden sm:table-cell">Tipo</TableHead>
-                                    <TableHead className="font-black text-[11px] uppercase tracking-widest h-12 hidden md:table-cell">Categoria</TableHead>
-                                    <TableHead className="font-black text-[11px] uppercase tracking-widest h-12">Data</TableHead>
-                                    <TableHead className="font-black text-[11px] uppercase tracking-widest h-12 hidden sm:table-cell">Status</TableHead>
-                                    <TableHead className="font-black text-[11px] uppercase tracking-widest h-12 text-right px-6">Valor</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loadingTransactions ? (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-10 text-[10px] uppercase font-black tracking-widest opacity-50 italic">Carregando...</TableCell>
-                                    </TableRow>
-                                ) : transactions.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-10 text-[10px] uppercase font-black tracking-widest opacity-50 italic">Nenhuma transação encontrada</TableCell>
-                                    </TableRow>
-                                ) : transactions.map((t) => (
-                                    <TableRow key={t.id} className="border-border hover:bg-brand-1/[0.04] transition-all group cursor-pointer active:bg-brand-1/[0.08]">
-                                        <TableCell className="font-medium px-6 py-5 flex items-center gap-4 whitespace-normal">
-                                            <div className={cn(
-                                                "h-10 w-10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all duration-300",
-                                                t.tipo_transacao === 'receita' ? "bg-brand-2/10 text-brand-2" : "bg-rose-500/10 text-rose-500"
-                                            )}>
-                                                {t.tipo_transacao === 'receita' ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />}
+                    ) : transactions.length === 0 ? (
+                        <EmptyState icon={Inbox} title="Nenhuma transação neste mês" description="Use “Nova transação” para lançar receitas e despesas." />
+                    ) : (
+                        <>
+                            {/* Mobile */}
+                            <ul className="stagger divide-y border-t md:hidden">
+                                {transactions.map(t => {
+                                    const isReceita = t.tipo_transacao === "receita"
+                                    return (
+                                        <li key={t.id} className="flex items-center gap-3 px-4 py-3">
+                                            <IconTile icon={isReceita ? ArrowUpCircle : ArrowDownCircle} tone={isReceita ? "success" : "danger"} size="sm" />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-medium">{t.descricao}</p>
+                                                <p className="truncate text-xs text-muted-foreground">
+                                                    {format(parseLocalDate(t.data_vencimento), "dd MMM", { locale: ptBR })} · {t.categoria?.nome || "Geral"}
+                                                </p>
                                             </div>
-                                            <div className="flex flex-col">
-                                                <span className="font-bold text-[13px] tracking-tight text-foreground group-hover:text-brand-1 transition-colors">{t.descricao}</span>
-                                                <span className="text-[10px] text-muted-foreground/50 uppercase font-black tracking-widest italic tracking-tighter">{t.categoria?.nome || 'Geral'}</span>
+                                            <div className="flex shrink-0 flex-col items-end gap-1">
+                                                <Amount value={t.valor} kind={t.tipo_transacao} className="text-sm" />
+                                                <TransactionStatusBadge status={deriveStatus(t)} kind={t.tipo_transacao} />
                                             </div>
-                                        </TableCell>
-                                        <TableCell className="hidden sm:table-cell"><span className="bg-secondary text-muted-foreground border border-border px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter">{t.tipo_transacao}</span></TableCell>
-                                        <TableCell className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-tighter font-body hidden md:table-cell">{t.categoria?.nome || '-'}</TableCell>
-                                        <TableCell className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-tighter font-body">
-                                            {format(parseLocalDate(t.data_vencimento), 'dd MMM yyyy', { locale: ptBR }).toUpperCase()}
-                                        </TableCell>
-                                        <TableCell className="hidden sm:table-cell">
-                                            <span className={cn(
-                                                "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest",
-                                                t.status === 'liquidado' ? "bg-brand-1/10 text-brand-1" : "bg-amber-500/10 text-amber-500"
-                                            )}>
-                                                {t.status}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell className={cn(
-                                            "text-right font-black px-6 tracking-tighter text-sm",
-                                            t.tipo_transacao === 'receita' ? "text-brand-2" : "text-rose-500"
-                                        )}>
-                                            {t.tipo_transacao === 'receita' ? '+' : '−'} {formatCurrency(t.valor)}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                        </li>
+                                    )
+                                })}
+                            </ul>
 
-                        {!loadingTransactions && (
-                            <DataTablePagination
-                                page={page}
-                                pageSize={pageSize}
-                                totalCount={totalCount}
-                                onPageChange={setPage}
-                                onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
-                            />
-                        )}
-                    </CardContent>
-                </Card>
+                            {/* Desktop */}
+                            <div className="hidden md:block">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="px-6">Descrição</TableHead>
+                                            <TableHead>Perfil</TableHead>
+                                            <TableHead>Data</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="px-6 text-right">Valor</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {transactions.map(t => {
+                                            const isReceita = t.tipo_transacao === "receita"
+                                            return (
+                                                <TableRow key={t.id}>
+                                                    <TableCell className="px-6 py-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <IconTile icon={isReceita ? ArrowUpCircle : ArrowDownCircle} tone={isReceita ? "success" : "danger"} size="sm" />
+                                                            <div className="min-w-0">
+                                                                <p className="truncate font-medium">{t.descricao}</p>
+                                                                <p className="truncate text-xs text-muted-foreground">{t.categoria?.nome || "Geral"}</p>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell><ProfileBadge tipo={t.tipo} /></TableCell>
+                                                    <TableCell className="text-muted-foreground tabular-nums">
+                                                        {format(parseLocalDate(t.data_vencimento), "dd MMM yyyy", { locale: ptBR })}
+                                                    </TableCell>
+                                                    <TableCell><TransactionStatusBadge status={deriveStatus(t)} kind={t.tipo_transacao} /></TableCell>
+                                                    <TableCell className="px-6 text-right"><Amount value={t.valor} kind={t.tipo_transacao} /></TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </>
+                    )}
+
+                    {!loadingTransactions && (
+                        <DataTablePagination
+                            page={page}
+                            pageSize={pageSize}
+                            totalCount={totalCount}
+                            onPageChange={setPage}
+                            onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+                        />
+                    )}
+                </SectionCard>
             </div>
 
-            {/* Right Sidebar Area */}
-            <div className="lg:col-span-4 space-y-8">
-                <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Ações Rápidas</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <TransactionForm
-                            type="receita"
-                            trigger={
-                                <Button variant="outline" className="h-28 flex flex-col gap-3 glass-card border-none hover:bg-brand-1 hover:text-zinc-950 transition-all duration-500 group rounded-[1.5rem] cursor-pointer active:scale-95 shadow-lg hover:shadow-brand-1/20 dark:text-foreground">
-                                    <div className="h-10 w-10 rounded-xl bg-brand-1/10 flex items-center justify-center group-hover:bg-zinc-950 group-hover:text-brand-1 transition-all">
-                                        <Plus className="h-6 w-6 transition-transform group-hover:scale-110" />
-                                    </div>
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Receita</span>
-                                </Button>
-                            }
-                        />
-                        <TransactionForm
-                            type="despesa"
-                            trigger={
-                                <Button variant="outline" className="h-28 flex flex-col gap-3 glass-card border-none hover:bg-rose-500 hover:text-white transition-all duration-500 group rounded-[1.5rem] cursor-pointer active:scale-95 shadow-lg hover:shadow-rose-500/20 dark:text-foreground">
-                                    <div className="h-10 w-10 rounded-xl bg-rose-500/10 flex items-center justify-center group-hover:bg-white group-hover:text-rose-500 transition-all">
-                                        <ArrowDownCircle className="h-6 w-6 transition-transform group-hover:scale-110" />
-                                    </div>
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Despesa</span>
-                                </Button>
-                            }
-                        />
-                    </div>
-                </div>
-
+            <aside className="stagger min-w-0 space-y-6 lg:col-span-4">
                 <QuickBalanceDetail stats={stats} loading={loadingStats} />
-
                 <BankAccountsBalance />
-
                 <UpcomingPayments items={upcoming} loading={loadingAlerts} />
                 <AlertCard alerts={alerts} loading={loadingAlerts} />
-            </div>
+                <p className="text-center text-xs text-muted-foreground">
+                    Precisa de mais detalhes? <Link href="/relatorios" className="font-medium text-brand-1 underline-offset-4 hover:underline">Ver relatórios</Link>
+                </p>
+            </aside>
         </div>
     )
 }

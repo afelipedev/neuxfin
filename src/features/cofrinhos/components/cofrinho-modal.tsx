@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { PiggyBank, Target, Calendar as CalendarIcon } from "lucide-react"
+import { PiggyBank, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select"
 import { useCofrinhoActions } from "../hooks/use-cofrinhos"
 import { Cofrinho } from "../services/cofrinhos"
+import { DatePicker } from "@/components/ds"
 
 const formSchema = z.object({
     nome: z.string().min(2, {
@@ -90,7 +91,7 @@ export function CofrinhoModal({ open, onOpenChange, cofrinho, onSuccess }: Cofri
                 cor: cofrinho.cor,
                 icone: cofrinho.icone,
                 tipo_liquidez: cofrinho.tipo_liquidez,
-                data_prevista: cofrinho.data_prevista ? new Date(cofrinho.data_prevista).toISOString().split('T')[0] : "",
+                data_prevista: cofrinho.data_prevista ? cofrinho.data_prevista.slice(0, 10) : "",
             })
         } else if (!open) {
             form.reset({
@@ -133,7 +134,7 @@ export function CofrinhoModal({ open, onOpenChange, cofrinho, onSuccess }: Cofri
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>{cofrinho ? "Editar Cofrinho" : "Novo Cofrinho"}</DialogTitle>
+                    <DialogTitle>{cofrinho ? "Editar cofrinho" : "Novo cofrinho"}</DialogTitle>
                     <DialogDescription>
                         Defina seus objetivos de economia e investimentos.
                     </DialogDescription>
@@ -207,7 +208,7 @@ export function CofrinhoModal({ open, onOpenChange, cofrinho, onSuccess }: Cofri
                                             <button
                                                 key={color.value}
                                                 type="button"
-                                                className={`h-8 w-8 rounded-full border-2 transition-all ${field.value === color.value ? "border-black dark:border-white scale-110" : "border-transparent opacity-60 hover:opacity-100"}`}
+                                                className={`h-8 w-8 rounded-full border-2 transition-all ${field.value === color.value ?"border-foreground scale-110" : "border-transparent opacity-60 hover:opacity-100"}`}
                                                 style={{ backgroundColor: color.value }}
                                                 onClick={() => field.onChange(color.value)}
                                                 title={color.name}
@@ -223,20 +224,17 @@ export function CofrinhoModal({ open, onOpenChange, cofrinho, onSuccess }: Cofri
                             name="data_prevista"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Data Prevista (Opcional)</FormLabel>
+                                    <FormLabel>Data prevista (opcional)</FormLabel>
                                     <FormControl>
-                                        <div className="relative">
-                                            <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                            <Input type="date" className="pl-9" {...field} />
-                                        </div>
+                                        <DatePicker value={field.value} onChange={field.onChange} clearable placeholder="Sem data definida" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
                         <DialogFooter className="pt-4">
-                            <Button type="submit" disabled={loading} className="w-full bg-orange-600 hover:bg-orange-700">
-                                {loading ? "Salvando..." : cofrinho ? "Atualizar" : "Criar Cofrinho"}
+                            <Button type="submit" disabled={loading} className="w-full">
+                                {loading ? "Salvando..." : cofrinho ? "Atualizar" : "Criar cofrinho"}
                             </Button>
                         </DialogFooter>
                     </form>

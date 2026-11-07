@@ -36,7 +36,7 @@ export function DeleteSubscriptionDialog({ subscription, onSuccess, trigger }: D
         <AlertDialog>
             <AlertDialogTrigger asChild>
                 {trigger || (
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950">
+                    <Button variant="ghost" size="icon-sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" aria-label="Excluir assinatura">
                         <Trash2 className="h-4 w-4" />
                     </Button>
                 )}
@@ -57,7 +57,7 @@ export function DeleteSubscriptionDialog({ subscription, onSuccess, trigger }: D
                     <AlertDialogAction
                         onClick={handleDelete}
                         disabled={loading}
-                        className="bg-rose-600 hover:bg-rose-700 text-white"
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                         {loading ? 'Excluindo...' : 'Excluir'}
                     </AlertDialogAction>

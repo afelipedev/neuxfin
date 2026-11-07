@@ -15,7 +15,8 @@ interface CategoryPieChartProps {
     height?: number
 }
 
-const DEFAULT_COLORS = ["#26c8a6", "#45d6bc", "#64e4d3", "#83f1e9", "#a2ffff", "#fb7185", "#f43f5e", "#e11d48"]
+/** Paleta categórica do design system (tokens --chart-1..8, ajustados por tema). */
+const DEFAULT_COLORS = Array.from({ length: 8 }, (_, i) => `var(--chart-${i + 1})`)
 
 /** Itens que o Recharts injeta no `content` da Legend (subconjunto usado aqui). */
 interface LegendItem {
@@ -35,7 +36,7 @@ function ScrollableLegend({ payload }: { payload?: readonly LegendItem[] }) {
                             className="h-2 w-2 rounded-full shrink-0"
                             style={{ backgroundColor: entry?.color }}
                         />
-                        <span className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                             {entry?.value}
                         </span>
                     </li>
@@ -48,7 +49,7 @@ function ScrollableLegend({ payload }: { payload?: readonly LegendItem[] }) {
 export function CategoryPieChart({ data = [], className, height = 300 }: CategoryPieChartProps) {
     if (!data || data.length === 0) {
         return (
-            <div className={cn("flex flex-col items-center justify-center text-muted-foreground text-[10px] uppercase font-black tracking-widest opacity-50 italic", className)} style={{ height }}>
+            <div className={cn("flex flex-col items-center justify-center text-sm text-muted-foreground", className)} style={{ height }}>
                 Nenhum dado para exibir
             </div>
         )
@@ -68,7 +69,8 @@ export function CategoryPieChart({ data = [], className, height = 300 }: Categor
                         cy="50%"
                         innerRadius={innerRadius}
                         outerRadius={outerRadius}
-                        paddingAngle={5}
+                        paddingAngle={3}
+                        stroke="var(--card)"
                         dataKey="value"
                     >
                         {data.map((entry, index) => (
@@ -80,14 +82,13 @@ export function CategoryPieChart({ data = [], className, height = 300 }: Categor
                     </Pie>
                     <Tooltip
                         contentStyle={{
-                            backgroundColor: 'rgba(9, 9, 11, 0.8)',
-                            border: 'none',
-                            borderRadius: '12px',
-                            backdropFilter: 'blur(8px)',
-                            color: '#fff',
-                            fontSize: '10px'
+                            backgroundColor: "var(--popover)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "10px",
+                            color: "var(--popover-foreground)",
+                            fontSize: "12px",
                         }}
-                        itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+                        itemStyle={{ color: "var(--popover-foreground)", fontWeight: 600 }}
                         formatter={(value: number | undefined) => [
                             formatCurrency(value),
                             ''
