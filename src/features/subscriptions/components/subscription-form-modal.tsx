@@ -50,12 +50,16 @@ const formSchema = z.object({
     cartao_id: z.string().optional(),
     conta_id: z.string().optional(),
     data_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data de início"),
+    data_fim: z.string().optional(),
     frequencia: z.enum(["mensal", "anual", "semanal", "trimestral"]),
     data_vencimento_dia: z.number().min(1).max(31),
     status: z.enum(["ativo", "pausado", "cancelado"]),
     url: z.string().optional(),
     icone: z.string().optional(),
     cor: z.string().optional(),
+}).refine(v => !v.data_fim || v.data_fim >= v.data_inicio, {
+    message: "O encerramento não pode ser antes do início.",
+    path: ["data_fim"],
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -104,6 +108,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
             cartao_id: "",
             conta_id: "",
             data_inicio: todayISO(),
+            data_fim: "",
             frequencia: "mensal",
             data_vencimento_dia: 1,
             status: "ativo",
@@ -115,6 +120,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
 
     const cartaoId = form.watch("cartao_id")
     const frequencia = form.watch("frequencia")
+    const dataInicio = form.watch("data_inicio")
     const contaPadrao = accounts.find(a => a.padrao)
 
     // Quando abrir o modal e houver uma assinatura para editar
@@ -128,6 +134,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                 cartao_id: subscription.cartao_id || "",
                 conta_id: subscription.conta_id || "",
                 data_inicio: subscription.data_inicio?.slice(0, 10) || todayISO(),
+                data_fim: subscription.data_fim?.slice(0, 10) || "",
                 frequencia: subscription.frequencia || "mensal",
                 data_vencimento_dia: subscription.data_vencimento_dia || 1,
                 status: subscription.status || "ativo",
@@ -144,6 +151,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                 cartao_id: "",
                 conta_id: "",
                 data_inicio: todayISO(),
+                data_fim: "",
                 frequencia: "mensal",
                 data_vencimento_dia: 1,
                 status: "ativo",
@@ -196,6 +204,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                 // No cartão a despesa entra na fatura; a conta só vale fora dele
                 conta_id: values.cartao_id ? null : (values.conta_id || null),
                 data_inicio: values.data_inicio,
+                data_fim: values.data_fim || null,
                 frequencia: values.frequencia,
                 data_vencimento_dia: values.data_vencimento_dia,
                 status: values.status,
@@ -310,7 +319,17 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Frequência</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
+                                        <Select
+                                            onValueChange={value => {
+                                                field.onChange(value)
+                                                // Cancelar sem data de fim: sugere encerrar hoje
+                                                if (value === "cancelado" && !form.getValues("data_fim")) {
+                                                    const hoje = todayISO()
+                                                    form.setValue("data_fim", hoje < form.getValues("data_inicio") ? form.getValues("data_inicio") : hoje)
+                                                }
+                                            }}
+                                            value={field.value}
+                                        >
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Selecione" />
@@ -347,6 +366,29 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                                                 : frequencia === "semanal"
                                                     ? "Cobrada a cada 7 dias a partir desta data."
                                                     : "Nenhuma despesa é lançada antes desta data."}
+                                    </p>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="data_fim"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Encerra em (opcional)</FormLabel>
+                                    <FormControl>
+                                        <DatePicker
+                                            value={field.value || null}
+                                            onChange={iso => field.onChange(iso ?? "")}
+                                            min={dataInicio}
+                                            clearable
+                                            placeholder="Sem data para acabar"
+                                        />
+                                    </FormControl>
+                                    <p className="text-xs text-muted-foreground">
+                                        Última data em que a assinatura pode cobrar. Depois dela, nenhuma despesa é lançada.
                                     </p>
                                     <FormMessage />
                                 </FormItem>

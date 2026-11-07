@@ -41,6 +41,6 @@ export const DEFAULT_MODEL = 'openai/gpt-oss-20b'
 export const providerLabel = (id: string) => AI_PROVIDERS.find(p => p.id === id)?.label ?? id
 
 export const AI_USAGE_LABEL: Record<AIUsage, string> = {
-    chat: 'Chat (Amigão e WhatsApp)',
+    chat: 'Chat (Amigão e Telegram)',
     analise: 'Análise de relatórios',
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { monthlyCost, subscriptionOccurrences, type ScheduleInput } from './schedule'
+import { isSubscriptionEnded, monthlyCost, subscriptionOccurrences, type ScheduleInput } from './schedule'
 
 const sub = (p: Partial<ScheduleInput>): ScheduleInput => ({
     frequencia: 'mensal',
@@ -66,5 +66,25 @@ describe('monthlyCost', () => {
         expect(monthlyCost(90, 'trimestral')).toBe(30)
         expect(monthlyCost(30, 'semanal')).toBe(130) // 30 × 52 ÷ 12
         expect(monthlyCost('19.90', null)).toBe(19.9)
+    })
+})
+
+describe('data de encerramento', () => {
+    it('não cobra depois de data_fim (o próprio dia ainda cobra)', () => {
+        const s = sub({ data_vencimento_dia: 10, data_fim: '2026-11-10' })
+        expect(subscriptionOccurrences(s, 2026, 11)).toEqual(['2026-11-10'])
+        expect(subscriptionOccurrences(s, 2026, 12)).toEqual([])
+        expect(subscriptionOccurrences({ ...s, data_fim: '2026-11-09' }, 2026, 11)).toEqual([])
+    })
+
+    it('semanal para no meio do mês', () => {
+        const s = sub({ frequencia: 'semanal', data_inicio: '2026-11-02', data_fim: '2026-11-20' })
+        expect(subscriptionOccurrences(s, 2026, 11)).toEqual(['2026-11-02', '2026-11-09', '2026-11-16'])
+    })
+
+    it('encerrada só depois que a data passou', () => {
+        expect(isSubscriptionEnded({ data_fim: '2026-11-07' }, '2026-11-07')).toBe(false)
+        expect(isSubscriptionEnded({ data_fim: '2026-11-06' }, '2026-11-07')).toBe(true)
+        expect(isSubscriptionEnded({ data_fim: null }, '2026-11-07')).toBe(false)
     })
 })

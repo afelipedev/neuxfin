@@ -322,7 +322,7 @@ export function AIModelsSettings() {
                             <legend className="text-sm font-medium">Usar este modelo em</legend>
                             <label className="flex items-center gap-2 text-sm">
                                 <Checkbox checked={form.usar_chat} onCheckedChange={(v) => setForm(f => ({ ...f, usar_chat: v === true }))} />
-                                Chat (Amigão e WhatsApp)
+                                Chat (Amigão e Telegram)
                             </label>
                             <label className="flex items-center gap-2 text-sm">
                                 <Checkbox checked={form.usar_analise} onCheckedChange={(v) => setForm(f => ({ ...f, usar_analise: v === true }))} />

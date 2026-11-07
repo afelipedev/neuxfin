@@ -4,7 +4,7 @@ import { formatDateToISO, parseLocalDate } from '@/lib/utils'
 import { deriveStatus, fromCents, scopeToUser, toCents, todayISO } from '@/features/bank-accounts/services/balances'
 import { fetchCardsOverview, INVOICE_STATUS_LABEL } from '@/features/credit-cards/services/invoices'
 import { fetchBudgetProgress } from '@/features/budgets/services/budgets'
-import { monthlyCost, subscriptionOccurrences, type SubscriptionFrequency } from '@/features/subscriptions/services/schedule'
+import { displaySubscriptionStatus, monthlyCost, subscriptionOccurrences, type SubscriptionFrequency } from '@/features/subscriptions/services/schedule'
 
 /**
  * Ferramentas de consulta da IA para as demais áreas do app (assinaturas, cartões, cofrinhos,
@@ -34,7 +34,7 @@ const monthRange = (month?: number | null, year?: number | null) => {
 // ---------- Schemas ----------
 
 export const getSubscriptionsSchema = z.object({
-    status: z.enum(['ativo', 'pausado', 'cancelado', 'todas']).nullish().describe('Filtrar por status. Padrão: ativo.'),
+    status: z.enum(['ativo', 'pausado', 'cancelado', 'encerrado', 'todas']).nullish().describe('Filtrar por status (encerrado = passou da data de encerramento). Padrão: ativo.'),
 })
 
 export const getCardsSchema = z.object({})
@@ -71,7 +71,8 @@ export const markTransactionPaidSchema = z.object({
 interface SubscriptionRow {
     nome: string
     valor: number | string
-    status: string
+    status: 'ativo' | 'pausado' | 'cancelado'
+    data_fim: string | null
     frequencia: SubscriptionFrequency | null
     data_vencimento_dia: number | null
     data_inicio: string
@@ -80,7 +81,7 @@ interface SubscriptionRow {
 }
 
 /** Próxima cobrança a partir de hoje (procura até 13 meses à frente). */
-export function nextSubscriptionCharge(sub: Pick<SubscriptionRow, 'frequencia' | 'data_vencimento_dia' | 'data_inicio'>, today: string): string | null {
+export function nextSubscriptionCharge(sub: Pick<SubscriptionRow, 'frequencia' | 'data_vencimento_dia' | 'data_inicio'> & { data_fim?: string | null }, today: string): string | null {
     const base = parseLocalDate(today)
     for (let i = 0; i <= 13; i++) {
         const d = new Date(base.getFullYear(), base.getMonth() + i, 1)
@@ -90,18 +91,19 @@ export function nextSubscriptionCharge(sub: Pick<SubscriptionRow, 'frequencia' |
     return null
 }
 
-export async function getSubscriptionsCore(supabase: SupabaseClient, status: 'ativo' | 'pausado' | 'cancelado' | 'todas', userId?: string) {
-    let query = scopeToUser(supabase
+export async function getSubscriptionsCore(supabase: SupabaseClient, status: 'ativo' | 'pausado' | 'cancelado' | 'encerrado' | 'todas', userId?: string) {
+    const { data, error } = await scopeToUser(supabase
         .from('assinaturas')
-        .select('nome, valor, status, frequencia, data_vencimento_dia, data_inicio, cartao:cartoes_credito(nome), conta:contas_bancarias(nome)'), userId)
+        .select('nome, valor, status, frequencia, data_vencimento_dia, data_inicio, data_fim, cartao:cartoes_credito(nome), conta:contas_bancarias(nome)'), userId)
         .order('nome')
-    if (status !== 'todas') query = query.eq('status', status)
-    const { data, error } = await query
     if (error) throw new Error(`Erro ao buscar assinaturas: ${error.message}`)
 
     const today = todayISO()
-    const rows = (data ?? []) as unknown as SubscriptionRow[]
-    const ativas = rows.filter(r => r.status === 'ativo')
+    // Status considerando a data de encerramento (ativa com data_fim no passado = encerrada)
+    const rows = ((data ?? []) as unknown as SubscriptionRow[])
+        .map(r => ({ ...r, situacao: displaySubscriptionStatus(r, today) }))
+        .filter(r => status === 'todas' || r.situacao === status)
+    const ativas = rows.filter(r => r.situacao === 'ativo')
     return {
         quantidade: rows.length,
         custo_mensal_das_ativas: fromCents(ativas.reduce((acc, r) => acc + toCents(monthlyCost(r.valor, r.frequencia)), 0)),
@@ -109,8 +111,10 @@ export async function getSubscriptionsCore(supabase: SupabaseClient, status: 'at
             nome: r.nome,
             valor: Number(r.valor),
             frequencia: r.frequencia ?? 'mensal',
-            status: r.status,
-            proxima_cobranca: r.status === 'ativo' ? nextSubscriptionCharge(r, today) : null,
+            status: r.situacao,
+            inicio: r.data_inicio,
+            encerra_em: r.data_fim,
+            proxima_cobranca: r.situacao === 'ativo' ? nextSubscriptionCharge(r, today) : null,
             cobrada_em: r.cartao ? `cartão ${r.cartao.nome}` : r.conta ? `conta ${r.conta.nome}` : 'conta padrão',
         })),
     }
