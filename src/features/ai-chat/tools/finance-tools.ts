@@ -43,6 +43,9 @@ export const addTransactionSchema = z.object({
     ),
     conta_nome: z.string().nullish().describe(
         'Nome da conta bancária citada pelo usuário (ex.: "Nubank"). Se omitido, usa a conta padrão do usuário.'
+    ),
+    cartao_nome: z.string().nullish().describe(
+        'Nome do cartão de crédito quando a DESPESA foi no cartão (ex.: "no cartão Nubank", "no crédito"). Compra no cartão entra na fatura; não use conta_nome junto.'
     )
 })
 
@@ -207,6 +210,51 @@ export const addTransactionCore = async (
         if (defaultCat) categoria_id = defaultCat.id
     }
     if (!categoria_id) throw new Error("Não foi possível identificar uma categoria para esta transação.")
+
+    // Compra no cartão: entra na fatura (sem conta, pendente até pagar a fatura)
+    if (params.cartao_nome) {
+        if (params.tipo_transacao !== 'despesa') throw new Error('Só despesas podem ser lançadas no cartão de crédito.')
+        const { data: cartoes, error: cartoesError } = await supabase
+            .from('cartoes_credito')
+            .select('id, nome')
+            .eq('usuario_id', user_id)
+        if (cartoesError) throw new Error(`Erro ao buscar cartões: ${cartoesError.message}`)
+        const lista = (cartoes ?? []) as Array<{ id: string; nome: string }>
+        const nome = params.cartao_nome.toLowerCase()
+        const cartao = lista.find(c => c.nome.toLowerCase().includes(nome) || nome.includes(c.nome.toLowerCase()))
+            ?? (lista.length === 1 ? lista[0] : undefined)
+        if (!cartao) {
+            return {
+                success: false,
+                erro: lista.length
+                    ? `Não achei o cartão "${params.cartao_nome}". Cartões cadastrados: ${lista.map(c => c.nome).join(', ')}.`
+                    : 'Nenhum cartão de crédito cadastrado no app.',
+            }
+        }
+        const dataCompra = params.data_vencimento && DATE_RE.test(params.data_vencimento.slice(0, 10))
+            ? params.data_vencimento.slice(0, 10)
+            : todayISO()
+        const { data: saved, error } = await supabase
+            .from('transacoes')
+            .insert([{
+                usuario_id: user_id,
+                descricao: params.descricao,
+                valor: params.valor,
+                tipo: params.tipo ?? 'PF',
+                tipo_transacao: 'despesa',
+                categoria_id,
+                conta_id: null,
+                cartao_id: cartao.id,
+                status: 'pendente',
+                data_vencimento: dataCompra,
+                data_pagamento: null,
+                is_recorrente: false,
+            }])
+            .select('id, descricao, valor, tipo_transacao, status, data_vencimento')
+            .single()
+        if (error) throw new Error(`Erro ao salvar: ${error.message}`)
+        return { success: true, transaction: saved, cartao: cartao.nome, aviso: 'Compra no cartão: entra na fatura e só sai da conta quando a fatura for paga.' }
+    }
 
     const { data: contas, error: contasError } = await supabase
         .from('contas_bancarias')

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatDateToISO } from '@/lib/utils'
-import { fromCents, toCents } from '@/features/bank-accounts/services/balances'
+import { fromCents, scopeToUser, toCents } from '@/features/bank-accounts/services/balances'
 
 /**
  * Orçamento mensal por categoria.
@@ -73,10 +73,10 @@ export function buildBudgetProgress(budgets: Budget[], expenses: BudgetExpense[]
 
 // ---------- Acesso a dados (cliente injetado) ----------
 
-export async function fetchBudgets(supabase: SupabaseClient): Promise<Budget[]> {
-    const { data, error } = await supabase
+export async function fetchBudgets(supabase: SupabaseClient, userId?: string): Promise<Budget[]> {
+    const { data, error } = await scopeToUser(supabase
         .from('orcamentos')
-        .select('id, categoria_id, valor_mensal, tipo, categoria:categorias(nome, cor, icone)')
+        .select('id, categoria_id, valor_mensal, tipo, categoria:categorias(nome, cor, icone)'), userId)
         .is('removido_em', null)
         .order('created_at')
     if (error) throw error
@@ -84,10 +84,10 @@ export async function fetchBudgets(supabase: SupabaseClient): Promise<Budget[]> 
 }
 
 /** Despesas do mês (competência) com categoria, para comparar com os orçamentos. */
-export async function fetchMonthExpenses(supabase: SupabaseClient, month: number, year: number): Promise<BudgetExpense[]> {
-    const { data, error } = await supabase
+export async function fetchMonthExpenses(supabase: SupabaseClient, month: number, year: number, userId?: string): Promise<BudgetExpense[]> {
+    const { data, error } = await scopeToUser(supabase
         .from('transacoes')
-        .select('categoria_id, valor, tipo')
+        .select('categoria_id, valor, tipo'), userId)
         .eq('tipo_transacao', 'despesa')
         .not('categoria_id', 'is', null)
         .gte('data_vencimento', formatDateToISO(new Date(year, month - 1, 1)))
@@ -97,8 +97,9 @@ export async function fetchMonthExpenses(supabase: SupabaseClient, month: number
     return (data ?? []) as BudgetExpense[]
 }
 
-export async function fetchBudgetProgress(supabase: SupabaseClient, month: number, year: number): Promise<BudgetProgress[]> {
-    const [budgets, expenses] = await Promise.all([fetchBudgets(supabase), fetchMonthExpenses(supabase, month, year)])
+/** `userId` é obrigatório com o client service-role (bot do Telegram). */
+export async function fetchBudgetProgress(supabase: SupabaseClient, month: number, year: number, userId?: string): Promise<BudgetProgress[]> {
+    const [budgets, expenses] = await Promise.all([fetchBudgets(supabase, userId), fetchMonthExpenses(supabase, month, year, userId)])
     if (budgets.length === 0) return []
     return buildBudgetProgress(budgets, expenses)
 }

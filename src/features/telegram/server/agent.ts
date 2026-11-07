@@ -1,76 +1,90 @@
-import { generateText, stepCountIs, tool } from 'ai'
+import { generateText, stepCountIs, type ModelMessage } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveModel } from '@/features/ai-models/server/resolve-model'
-import {
-    addTransactionCore,
-    addTransactionSchema,
-    getBalanceCore,
-    getBalanceSchema,
-    getRecentTransactionsCore,
-    getTransactionsSchema,
-    getUpcomingBillsCore,
-    getUpcomingBillsSchema,
-} from '@/features/ai-chat/tools/finance-tools'
+import { buildFinanceTools, FINANCE_TOOLS_GUIDE } from '@/features/ai-chat/tools/finance-toolset'
 
-const system = () => `Você é o "Amigão", assistente financeiro do NeuxFin, conversando pelo Telegram.
+/** Mensagens anteriores usadas como contexto (janela curta: é uma conversa de chat). */
+const HISTORY_LIMIT = 10
+const HISTORY_WINDOW_MIN = 30
+const HISTORY_RETENTION_DAYS = 7
+
+const system = () => `Você é o "Amigão", assistente financeiro do app NeuxFin, conversando pelo Telegram.
 
 PERSONALIDADE: descontraído, levemente sarcástico e muito útil. Gírias leves ("bora", "beleza", "só dale").
 
-O QUE FAZER:
-- Relato de gasto ou ganho ("gastei", "paguei", "recebi", "vence dia") → registre com add_transaction.
-  · pago=true quando o dinheiro já saiu/entrou; pago=false para contas a pagar/receber no futuro.
-  · Se o usuário citar o banco/conta ("no Nubank"), informe conta_nome.
-  · Infira a categoria pelo contexto (ex.: "almoço" → Alimentação, "uber" → Transporte).
-  · Se faltar o valor, pergunte antes de registrar. Não invente valores.
-- Perguntas de saldo → get_balance (fale do saldo_disponivel). Gastos recentes → get_recent_transactions.
-  Contas e faturas a vencer → get_upcoming_bills.
-- Assuntos fora de finanças: responda em uma frase que você cuida só das finanças.
+${FINANCE_TOOLS_GUIDE}
+
+REGISTROS:
+- Infira a categoria pelo contexto (ex.: "almoço" → Alimentação, "uber" → Transporte).
+- Depois de registrar, confirme em 1 ou 2 linhas: tipo, valor, descrição, data e conta/cartão (ou avise que ficou sem conta).
+- Se o usuário responder a uma pergunta sua (ex.: só o valor), use o histórico da conversa para completar.
 
 FORMATO (Telegram, texto puro):
-- Sem Markdown: nada de **, #, tabelas ou blocos de código. Pode usar emojis com moderação e "• " para listas.
+- Sem Markdown: nada de **, #, tabelas ou blocos de código. Emojis com moderação e "• " para listas.
 - Valores como R$ 1.234,56 e datas como 10/11/2026.
-- Depois de registrar, confirme em 1 ou 2 linhas: tipo, valor, descrição, data e conta (ou avise que ficou sem conta).
-- No máximo ~8 linhas.
+- Seja direto: no máximo ~10 linhas.
+- Só recuse assuntos que não têm nada a ver com dinheiro ou com o app (ex.: receita de bolo), em uma frase.
 
 Hoje é ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}. Datas nas ferramentas em YYYY-MM-DD.`
 
+type Admin = SupabaseClient
+
+async function loadHistory(supabase: Admin, userId: string, chatId: number): Promise<ModelMessage[]> {
+    const since = new Date(Date.now() - HISTORY_WINDOW_MIN * 60_000).toISOString()
+    const { data, error } = await supabase
+        .from('telegram_mensagens')
+        .select('papel, conteudo')
+        .eq('usuario_id', userId)
+        .eq('chat_id', chatId)
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(HISTORY_LIMIT)
+    if (error) {
+        console.error('[telegram] histórico', error)
+        return []
+    }
+    return ((data ?? []) as Array<{ papel: 'user' | 'assistant'; conteudo: string }>)
+        .reverse()
+        .map(m => ({ role: m.papel, content: m.conteudo }))
+}
+
+async function saveExchange(supabase: Admin, userId: string, chatId: number, user: string, assistant: string) {
+    const { error } = await supabase.from('telegram_mensagens').insert([
+        { usuario_id: userId, chat_id: chatId, papel: 'user', conteudo: user },
+        { usuario_id: userId, chat_id: chatId, papel: 'assistant', conteudo: assistant },
+    ])
+    if (error) console.error('[telegram] salvar histórico', error)
+
+    // Retenção: o histórico só serve de contexto imediato
+    const limite = new Date(Date.now() - HISTORY_RETENTION_DAYS * 86_400_000).toISOString()
+    await supabase.from('telegram_mensagens').delete().eq('usuario_id', userId).lt('created_at', limite)
+}
+
 /**
- * Agente financeiro do bot. `supabase` é o client service-role: TODAS as ferramentas
- * recebem userId e filtram por usuario_id.
+ * Agente financeiro do bot. `supabase` é o client service-role: as ferramentas recebem
+ * userId e filtram TODAS as consultas por usuario_id.
  */
-export async function runFinanceAgent(supabase: SupabaseClient, userId: string, message: string): Promise<string> {
-    const resolved = await resolveModel(userId, { usage: 'chat' })
+export async function runFinanceAgent(supabase: Admin, userId: string, chatId: number, message: string): Promise<string> {
+    const [resolved, history] = await Promise.all([
+        resolveModel(userId, { usage: 'chat' }),
+        loadHistory(supabase, userId, chatId),
+    ])
 
     const { text } = await generateText({
         model: resolved.model,
         providerOptions: resolved.providerOptions,
         system: system(),
-        prompt: message,
-        stopWhen: stepCountIs(5),
-        tools: {
-            get_balance: tool({
-                description: 'Saldo disponível hoje (soma das contas), saldo de cada conta, saldo previsto para o fim do mês e resumo de receitas/despesas do mês.',
-                inputSchema: getBalanceSchema,
-                execute: ({ month, year }) => getBalanceCore(supabase, month, year, userId),
-            }),
-            get_recent_transactions: tool({
-                description: 'Transações recentes (receitas ou despesas).',
-                inputSchema: getTransactionsSchema,
-                execute: ({ limit, type }) =>
-                    getRecentTransactionsCore(supabase, limit && limit > 0 ? Math.min(limit, 50) : 10, type ?? 'todos', userId),
-            }),
-            get_upcoming_bills: tool({
-                description: 'Contas e faturas de cartão a vencer nos próximos dias (inclui atrasadas).',
-                inputSchema: getUpcomingBillsSchema,
-                execute: ({ days }) => getUpcomingBillsCore(supabase, days && days > 0 ? Math.min(days, 90) : 7, userId),
-            }),
-            add_transaction: tool({
-                description: 'Registra uma receita ou despesa do usuário.',
-                inputSchema: addTransactionSchema,
-                execute: params => addTransactionCore(supabase, userId, params),
-            }),
-        },
+        messages: [...history, { role: 'user', content: message }],
+        stopWhen: stepCountIs(6),
+        tools: buildFinanceTools(supabase, userId),
     })
 
-    return text.trim() || 'Feito! 👍'
+    const reply = text.trim() || 'Feito! 👍'
+    await saveExchange(supabase, userId, chatId, message, reply)
+    return reply
+}
+
+/** Esquece a conversa (ex.: depois de desvincular). */
+export async function clearHistory(supabase: Admin, userId: string) {
+    await supabase.from('telegram_mensagens').delete().eq('usuario_id', userId)
 }
