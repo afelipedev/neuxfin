@@ -54,4 +54,20 @@ describe('buildAlerts', () => {
         const { alerts } = buildAlerts({ ...base, saldoPrevistoFimMes: undefined })
         expect(alerts.some(a => a.id === 'saldo-previsto-negativo')).toBe(false)
     })
+
+    it('orçamento em 80%+ vira atenção e estourado vira crítico', () => {
+        const mk = (id: string, percentual: number, status: 'ok' | 'atencao' | 'estourado', gasto: number) => ({
+            budget: { id, categoria_id: id, valor_mensal: 100, tipo: null, categoria: { nome: id } },
+            gasto, limite: 100, restante: 100 - gasto, percentual, status,
+        })
+        const { alerts } = buildAlerts({
+            ...base,
+            openTxs: [], cards: [], cofrinhosTotal: 6000, saldoPrevistoFimMes: 100,
+            budgets: [mk('Lazer', 1.2, 'estourado', 120), mk('Mercado', 0.85, 'atencao', 85), mk('Saúde', 0.1, 'ok', 10)],
+        })
+        expect(alerts.filter(a => a.id.startsWith('orcamento:')).map(a => [a.titulo, a.level])).toEqual([
+            ['Orçamento de Lazer estourado', 'critico'],
+            ['Orçamento de Mercado em 85%', 'atencao'],
+        ])
+    })
 })

@@ -7,6 +7,7 @@ import {
     PiggyBank,
     Repeat,
     Settings,
+    Target,
     type LucideIcon,
 } from "lucide-react"
 
@@ -24,6 +25,7 @@ export const MAIN_NAV: NavItem[] = [
     { title: "Cartões", url: "/cartoes", icon: CreditCard },
     { title: "Assinaturas", url: "/assinaturas", icon: Repeat },
     { title: "Cofrinhos", url: "/cofrinhos", icon: PiggyBank },
+    { title: "Orçamentos", url: "/orcamentos", icon: Target },
     { title: "Relatórios", url: "/relatorios", icon: PieChart },
 ]
 

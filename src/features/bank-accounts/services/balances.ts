@@ -10,7 +10,8 @@ import { formatDateToISO } from '@/lib/utils'
  *     · transações (receita +, despesa −), data efetiva = data_pagamento (ou vencimento);
  *     · transferências (destino +, origem −);
  *     · cofrinho com conta vinculada (resgate +, aporte −);
- *     · pagamento de fatura de cartão (−). As compras no cartão não têm conta e não entram.
+ *     · pagamento de fatura de cartão (−). As compras no cartão não têm conta e não entram;
+ *     · ajuste de saldo/conciliação (valor com sinal). Não é receita nem despesa.
  * - Se a conta tem data_saldo_inicial, movimentos anteriores a ela são ignorados
  *   (já estão refletidos no saldo inicial).
  * - Saldo Disponível = soma dos saldos de todas as contas em "hoje".
@@ -24,7 +25,7 @@ import { formatDateToISO } from '@/lib/utils'
 
 export type TxStatus = 'liquidado' | 'pendente' | 'atrasado'
 export type TxKind = 'receita' | 'despesa'
-export type MovementOrigin = 'transacao' | 'transferencia' | 'cofrinho' | 'fatura'
+export type MovementOrigin = 'transacao' | 'transferencia' | 'cofrinho' | 'fatura' | 'ajuste'
 
 export interface BalanceTx {
     id?: string
@@ -327,6 +328,44 @@ export function invoicePaymentsToMovements(rows: InvoicePaymentRow[]): Statement
     })
 }
 
+export interface AdjustmentRow {
+    id: string
+    conta_id: string
+    /** Com sinal: positivo aumenta o saldo, negativo diminui */
+    valor: number | string
+    data: string
+    descricao: string | null
+}
+
+/** Ajuste de saldo = entrada (valor positivo) ou saída (negativo) na conta. */
+export function adjustmentsToMovements(rows: AdjustmentRow[]): StatementTx[] {
+    return rows.map(a => {
+        const data = isoDay(a.data)
+        const cents = toCents(a.valor)
+        return {
+            id: `ajuste:${a.id}`,
+            ref_id: a.id,
+            origem: 'ajuste' as const,
+            conta_id: a.conta_id,
+            tipo_transacao: cents >= 0 ? 'receita' : 'despesa',
+            valor: fromCents(Math.abs(cents)),
+            status: 'liquidado' as const,
+            data_vencimento: data,
+            data_pagamento: data,
+            descricao: a.descricao || 'Ajuste de saldo',
+            categoria: { nome: 'Ajuste de saldo' }
+        }
+    })
+}
+
+/**
+ * Diferença (com sinal) para o saldo calculado bater com o saldo informado pelo usuário.
+ * Ex.: calculado 1.000, banco 950 → −50.
+ */
+export function reconciliationDelta(saldoCalculado: number, saldoInformado: number | string): number {
+    return fromCents(toCents(saldoInformado) - toCents(saldoCalculado))
+}
+
 // ---------- Acesso a dados (cliente injetado: browser ou server) ----------
 
 const PAGE_SIZE = 1000
@@ -353,11 +392,11 @@ function assertUuid(id: string) {
     if (!UUID_RE.test(id)) throw new Error('Identificador de conta inválido')
 }
 
-/** Transferências, movimentos de cofrinho e pagamentos de fatura que tocam contas (de uma conta, se informada). */
+/** Transferências, cofrinho, pagamentos de fatura e ajustes de saldo que tocam contas (de uma conta, se informada). */
 async function fetchNonTransactionMovements(supabase: SupabaseClient, contaId?: string): Promise<StatementTx[]> {
     if (contaId) assertUuid(contaId)
 
-    const [transfers, cofrinho, faturas] = await Promise.all([
+    const [transfers, cofrinho, faturas, ajustes] = await Promise.all([
         fetchAll<TransferRow>((from, to) => {
             let query = supabase
                 .from('transferencias')
@@ -386,13 +425,24 @@ async function fetchNonTransactionMovements(supabase: SupabaseClient, contaId?: 
                 .range(from, to)
             if (contaId) query = query.eq('conta_id', contaId)
             return query
+        }),
+        fetchAll<AdjustmentRow>((from, to) => {
+            let query = supabase
+                .from('ajustes_saldo')
+                .select('id, conta_id, valor, data, descricao')
+                .is('removido_em', null)
+                .order('id')
+                .range(from, to)
+            if (contaId) query = query.eq('conta_id', contaId)
+            return query
         })
     ])
 
     return [
         ...transfersToMovements(transfers, contaId),
         ...cofrinhoToMovements(cofrinho),
-        ...invoicePaymentsToMovements(faturas)
+        ...invoicePaymentsToMovements(faturas),
+        ...adjustmentsToMovements(ajustes)
     ]
 }
 

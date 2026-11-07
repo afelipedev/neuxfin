@@ -63,7 +63,10 @@ export function useAccountStatement(accountId: string, month: number, year: numb
                 && (tx.data_vencimento.slice(0, 10) >= from || deriveStatus(tx, today) === 'atrasado'))
             .sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento))
 
-        return { statement, saldoAtual, emAberto }
+        /** Saldo calculado ao fim de um dia (usado na conciliação). */
+        const balanceAt = (date: string) => computeAccountBalance(saldoInicial, transactions, date, desde)
+
+        return { statement, saldoAtual, emAberto, balanceAt }
     }, [account, transactions, month, year])
 
     return { account, loading, error, refresh: load, ...derived }

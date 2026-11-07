@@ -7,7 +7,7 @@ import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Inbox, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Amount, EmptyState, IconTile, MonthStepper, PageHeader, SectionCard, StatCard, StatGrid } from "@/components/ds"
+import { Amount, EmptyState, IconTile, MonthStepper, PageHeader, SectionCard, StatCard, StatGrid, ToneBadge } from "@/components/ds"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
     Table,
@@ -25,6 +25,16 @@ import { SettleTransactionDialog } from "@/features/transactions/components/sett
 import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
 import { TransferDialog } from "@/features/bank-accounts/components/transfer-dialog"
 import { DeleteTransferButton } from "@/features/bank-accounts/components/delete-transfer-button"
+import { AdjustBalanceDialog } from "@/features/bank-accounts/components/adjust-balance-dialog"
+import { RemoveAdjustmentButton } from "@/features/bank-accounts/components/remove-adjustment-button"
+import type { StatementTx } from "@/features/bank-accounts/services/balances"
+
+/** Ações por linha do extrato: transferência pode ser excluída; ajuste, desfeito. */
+function RowActions({ tx }: { tx: StatementTx }) {
+    if (tx.origem === "transferencia") return <DeleteTransferButton transferId={tx.ref_id} />
+    if (tx.origem === "ajuste") return <RemoveAdjustmentButton adjustmentId={tx.ref_id} />
+    return null
+}
 
 const formatDay = (iso: string) => format(parseLocalDate(iso), "dd MMM", { locale: ptBR })
 
@@ -32,7 +42,7 @@ export default function AccountStatementPage() {
     const { id } = useParams<{ id: string }>()
     const [month, setMonth] = React.useState(new Date().getMonth() + 1)
     const [year, setYear] = React.useState(new Date().getFullYear())
-    const { account, loading, error, statement, saldoAtual, emAberto } = useAccountStatement(id, month, year)
+    const { account, loading, error, statement, saldoAtual, emAberto, balanceAt } = useAccountStatement(id, month, year)
 
     // Mais recentes primeiro na exibição; saldo corrido já calculado em ordem cronológica
     const rows = React.useMemo(() => [...statement.rows].reverse(), [statement.rows])
@@ -65,6 +75,7 @@ export default function AccountStatementPage() {
                 actions={
                     <>
                         <TransferDialog defaultOrigemId={id} />
+                        {account && <AdjustBalanceDialog contaId={id} balanceAt={balanceAt} />}
                         <MonthStepper month={month} year={year} onChange={(m, y) => { setMonth(m); setYear(y) }} />
                     </>
                 }
@@ -90,11 +101,14 @@ export default function AccountStatementPage() {
                             {extrato.pageItems.map(({ tx, data, valor_assinado, saldo_apos }) => (
                                 <li key={tx.id} className="flex items-center gap-3 px-4 py-3">
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium">{tx.descricao}</p>
+                                        <p className="flex items-center gap-1.5 text-sm font-medium">
+                                            <span className="truncate">{tx.descricao}</span>
+                                            {tx.origem === "ajuste" && <ToneBadge tone="info">Ajuste</ToneBadge>}
+                                        </p>
                                         <p className="truncate text-xs text-muted-foreground">{formatDay(data)} · Saldo {formatCurrency(saldo_apos)}</p>
                                     </div>
                                     <Amount value={valor_assinado} kind="auto" signed className="text-sm" />
-                                    {tx.origem === "transferencia" && <DeleteTransferButton transferId={tx.ref_id} />}
+                                    <RowActions tx={tx} />
                                 </li>
                             ))}
                         </ul>
@@ -114,12 +128,15 @@ export default function AccountStatementPage() {
                                     {extrato.pageItems.map(({ tx, data, valor_assinado, saldo_apos }) => (
                                         <TableRow key={tx.id}>
                                             <TableCell className="px-6 text-muted-foreground tabular-nums">{formatDay(data)}</TableCell>
-                                            <TableCell className="whitespace-normal font-medium">{tx.descricao}</TableCell>
+                                            <TableCell className="whitespace-normal font-medium">
+                                                {tx.descricao}
+                                                {tx.origem === "ajuste" && <ToneBadge tone="info" className="ml-2">Ajuste</ToneBadge>}
+                                            </TableCell>
                                             <TableCell className="hidden text-muted-foreground lg:table-cell">{tx.categoria?.nome || "—"}</TableCell>
                                             <TableCell className="text-right"><Amount value={valor_assinado} kind="auto" signed /></TableCell>
                                             <TableCell className={cn("text-right tabular-nums", saldo_apos < 0 && "text-destructive")}>{formatCurrency(saldo_apos)}</TableCell>
                                             <TableCell className="px-4 text-right">
-                                                {tx.origem === "transferencia" && <DeleteTransferButton transferId={tx.ref_id} />}
+                                                <RowActions tx={tx} />
                                             </TableCell>
                                         </TableRow>
                                     ))}
