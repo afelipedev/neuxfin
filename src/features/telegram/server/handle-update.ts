@@ -1,5 +1,6 @@
 import { experimental_transcribe as transcribe } from 'ai'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createUserScopedClient } from '@/lib/supabase/user-token'
 import { describeAIError, resolveTranscriptionModel } from '@/features/ai-models/server/resolve-model'
 import { getBalanceCore } from '@/features/ai-chat/tools/finance-tools'
 import { clearHistory, runFinanceAgent } from './agent'
@@ -56,7 +57,7 @@ async function handleCommand(admin: Admin, chatId: number, command: string, arg:
             return
         case 'saldo': {
             await sendTyping(chatId)
-            const balance = await getBalanceCore(admin, null, null, userId)
+            const balance = await getBalanceCore(createUserScopedClient(userId), null, null, userId)
             await sendMessage(chatId, formatBalanceMessage(balance))
             return
         }
@@ -88,7 +89,11 @@ async function transcribeVoice(userId: string, fileId: string): Promise<string |
     return result.text.trim()
 }
 
-/** Processa um update do Telegram (chamado depois de responder 200 ao webhook). */
+/**
+ * Processa um update do Telegram (chamado depois de responder 200 ao webhook).
+ * Service role só para o vínculo (quem é o dono do chat) e o histórico; dados financeiros
+ * sempre com o client do usuário (RLS).
+ */
 export async function handleUpdate(update: TelegramUpdate): Promise<void> {
     const parsed = parseUpdate(update)
     if (parsed.kind === 'ignore') return

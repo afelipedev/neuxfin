@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { safeNextPath } from '@/features/auth/password-policy'
 
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
-    // if "next" is in param, use it as the redirect URL
-    const next = searchParams.get('next') ?? '/'
+    // Só caminhos internos: impede open redirect (ex.: next=@site-malicioso.com)
+    const next = safeNextPath(searchParams.get('next'))
 
     if (code) {
         const supabase = await createClient()
@@ -24,6 +25,6 @@ export async function GET(request: Request) {
         }
     }
 
-    // return the user to an error page with instructions
-    return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+    // Link inválido ou expirado: volta para o login com aviso
+    return NextResponse.redirect(`${origin}/login?erro=link`)
 }

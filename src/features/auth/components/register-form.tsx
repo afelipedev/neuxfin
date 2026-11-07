@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
+import { PASSWORD_MIN_LENGTH, passwordProblem } from '../password-policy'
 
 export function RegisterForm() {
     const [loading, setLoading] = useState(false)
@@ -20,6 +21,13 @@ export function RegisterForm() {
         // Simple client validation could go here, e.g. password match
         const password = formData.get('password')
         const confirmPassword = formData.get('confirm-password')
+
+        const problem = passwordProblem(String(password ?? ''))
+        if (problem) {
+            toast.error(problem)
+            setLoading(false)
+            return
+        }
 
         if (password !== confirmPassword) {
             toast.error('As senhas não coincidem')
@@ -62,11 +70,12 @@ export function RegisterForm() {
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="password">Senha</Label>
-                <Input id="password" name="password" type="password" required />
+                <Input id="password" name="password" type="password" autoComplete="new-password" minLength={PASSWORD_MIN_LENGTH} required aria-describedby="password-hint" />
+                <p id="password-hint" className="text-xs text-muted-foreground">Mínimo de {PASSWORD_MIN_LENGTH} caracteres, com letras e números.</p>
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="confirm-password">Confirmar Senha</Label>
-                <Input id="confirm-password" name="confirm-password" type="password" required />
+                <Input id="confirm-password" name="confirm-password" type="password" autoComplete="new-password" required />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
