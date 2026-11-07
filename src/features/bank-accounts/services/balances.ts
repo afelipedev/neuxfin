@@ -392,8 +392,18 @@ function assertUuid(id: string) {
     if (!UUID_RE.test(id)) throw new Error('Identificador de conta inválido')
 }
 
+/**
+ * Restringe a consulta a um usuário. Obrigatório com o client service-role (bot do Telegram,
+ * automações), que ignora RLS; com o client do usuário logado o RLS já faz isso.
+ */
+export function scopeToUser<Q>(query: Q, userId: string | undefined, column = 'usuario_id'): Q {
+    if (!userId) return query
+    if (!UUID_RE.test(userId)) throw new Error('Usuário inválido')
+    return (query as unknown as { eq(column: string, value: string): Q }).eq(column, userId)
+}
+
 /** Transferências, cofrinho, pagamentos de fatura e ajustes de saldo que tocam contas (de uma conta, se informada). */
-async function fetchNonTransactionMovements(supabase: SupabaseClient, contaId?: string): Promise<StatementTx[]> {
+async function fetchNonTransactionMovements(supabase: SupabaseClient, contaId?: string, userId?: string): Promise<StatementTx[]> {
     if (contaId) assertUuid(contaId)
 
     const [transfers, cofrinho, faturas, ajustes] = await Promise.all([
@@ -403,16 +413,19 @@ async function fetchNonTransactionMovements(supabase: SupabaseClient, contaId?: 
                 .select('id, conta_origem_id, conta_destino_id, valor, data, descricao')
                 .order('id')
                 .range(from, to)
+            query = scopeToUser(query, userId)
             if (contaId) query = query.or(`conta_origem_id.eq.${contaId},conta_destino_id.eq.${contaId}`)
             return query
         }),
         fetchAll<CofrinhoMovRow>((from, to) => {
+            // cofrinho_transacoes não tem usuario_id: filtra pelo dono do cofrinho
             let query = supabase
                 .from('cofrinho_transacoes')
-                .select('id, tipo, valor, data, conta_id, cofrinho:cofrinhos(nome)')
+                .select(userId ? 'id, tipo, valor, data, conta_id, cofrinho:cofrinhos!inner(nome, usuario_id)' : 'id, tipo, valor, data, conta_id, cofrinho:cofrinhos(nome)')
                 .not('conta_id', 'is', null)
                 .order('id')
                 .range(from, to)
+            query = scopeToUser(query, userId, 'cofrinho.usuario_id')
             if (contaId) query = query.eq('conta_id', contaId)
             return query
         }),
@@ -423,6 +436,7 @@ async function fetchNonTransactionMovements(supabase: SupabaseClient, contaId?: 
                 .is('estornado_em', null)
                 .order('id')
                 .range(from, to)
+            query = scopeToUser(query, userId)
             if (contaId) query = query.eq('conta_id', contaId)
             return query
         }),
@@ -433,6 +447,7 @@ async function fetchNonTransactionMovements(supabase: SupabaseClient, contaId?: 
                 .is('removido_em', null)
                 .order('id')
                 .range(from, to)
+            query = scopeToUser(query, userId)
             if (contaId) query = query.eq('conta_id', contaId)
             return query
         })
@@ -447,7 +462,7 @@ async function fetchNonTransactionMovements(supabase: SupabaseClient, contaId?: 
 }
 
 /** Todos os movimentos vinculados a contas (transações liquidadas/em aberto + transferências + cofrinho). */
-export async function fetchAccountTransactions(supabase: SupabaseClient, contaId?: string): Promise<BalanceTx[]> {
+export async function fetchAccountTransactions(supabase: SupabaseClient, contaId?: string, userId?: string): Promise<BalanceTx[]> {
     if (contaId) assertUuid(contaId)
     const [txs, extras] = await Promise.all([
         fetchAll<BalanceTx>((from, to) => {
@@ -457,10 +472,11 @@ export async function fetchAccountTransactions(supabase: SupabaseClient, contaId
                 .not('conta_id', 'is', null)
                 .order('id')
                 .range(from, to)
+            query = scopeToUser(query, userId)
             if (contaId) query = query.eq('conta_id', contaId)
             return query
         }),
-        fetchNonTransactionMovements(supabase, contaId)
+        fetchNonTransactionMovements(supabase, contaId, userId)
     ])
     return [...txs, ...extras]
 }
@@ -506,11 +522,13 @@ export interface BalanceOverview<A extends BalanceAccount> {
 /** Contas com saldo atual + saldo disponível. */
 export async function fetchBalanceOverview<A extends BalanceAccount = BalanceAccount>(
     supabase: SupabaseClient,
-    asOf: string = todayISO()
+    asOf: string = todayISO(),
+    /** Obrigatório com client service-role */
+    userId?: string
 ): Promise<BalanceOverview<A>> {
     const [{ data: accountsData, error }, transactions] = await Promise.all([
-        supabase.from('contas_bancarias').select('*').order('nome'),
-        fetchAccountTransactions(supabase)
+        scopeToUser(supabase.from('contas_bancarias').select('*'), userId).order('nome'),
+        fetchAccountTransactions(supabase, undefined, userId)
     ])
     if (error) throw error
 

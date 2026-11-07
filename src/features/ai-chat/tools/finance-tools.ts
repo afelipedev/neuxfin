@@ -6,6 +6,7 @@ import {
     computeProjectedBalance,
     fetchBalanceOverview,
     fromCents,
+    scopeToUser,
     toCents,
     todayISO
 } from '@/features/bank-accounts/services/balances'
@@ -53,7 +54,12 @@ export const addTransactionSchema = z.object({
  * - saldo_previsto: saldo disponível + lançamentos em aberto até o fim do mês.
  * - mes: receitas/despesas do mês por vencimento (competência).
  */
-export const getBalanceCore = async (supabase: SupabaseClient, month?: number | null, year?: number | null) => {
+/**
+ * As funções *Core recebem `userId` opcional: com o client do usuário (cookies) o RLS isola os
+ * dados; com o client service-role (Telegram/automações) o userId é OBRIGATÓRIO e filtra
+ * todas as consultas por usuario_id.
+ */
+export const getBalanceCore = async (supabase: SupabaseClient, month?: number | null, year?: number | null, userId?: string) => {
     const targetMonth = month && month >= 1 && month <= 12 ? month : new Date().getMonth() + 1
     const targetYear = year || new Date().getFullYear()
 
@@ -61,13 +67,13 @@ export const getBalanceCore = async (supabase: SupabaseClient, month?: number | 
     const endDate = formatDateToISO(new Date(targetYear, targetMonth, 0))
 
     const [{ data: transactions, error }, overview, cards] = await Promise.all([
-        supabase
+        scopeToUser(supabase
             .from('transacoes')
             .select('valor, tipo_transacao, status')
             .gte('data_vencimento', startDate)
-            .lte('data_vencimento', endDate),
-        fetchBalanceOverview<{ id: string; nome: string; saldo_inicial: number }>(supabase),
-        fetchCardsOverview(supabase)
+            .lte('data_vencimento', endDate), userId),
+        fetchBalanceOverview<{ id: string; nome: string; saldo_inicial: number }>(supabase, todayISO(), userId),
+        fetchCardsOverview(supabase, todayISO(), userId)
     ])
 
     if (error) throw new Error(`Erro ao buscar saldo: ${error.message}`)
@@ -105,10 +111,10 @@ export const getBalanceCore = async (supabase: SupabaseClient, month?: number | 
     }
 }
 
-export const getRecentTransactionsCore = async (supabase: SupabaseClient, limit: number, type: 'todos' | 'receita' | 'despesa') => {
-    let query = supabase
+export const getRecentTransactionsCore = async (supabase: SupabaseClient, limit: number, type: 'todos' | 'receita' | 'despesa', userId?: string) => {
+    let query = scopeToUser(supabase
         .from('transacoes')
-        .select('id, descricao, valor, tipo_transacao, status, data_vencimento, categoria:categorias(nome)')
+        .select('id, descricao, valor, tipo_transacao, status, data_vencimento, categoria:categorias(nome)'), userId)
         .order('created_at', { ascending: false })
         .limit(limit)
 
@@ -122,21 +128,21 @@ export const getRecentTransactionsCore = async (supabase: SupabaseClient, limit:
 }
 
 /** Despesas em aberto (inclui atrasadas) até `days` dias + faturas de cartão a vencer. */
-export const getUpcomingBillsCore = async (supabase: SupabaseClient, days: number) => {
+export const getUpcomingBillsCore = async (supabase: SupabaseClient, days: number, userId?: string) => {
     const today = todayISO()
     const futureDate = formatDateToISO(new Date(new Date().setDate(new Date().getDate() + days)))
 
     const [{ data, error }, cards] = await Promise.all([
-        supabase
+        scopeToUser(supabase
             .from('transacoes')
-            .select('descricao, valor, data_vencimento, conta:contas_bancarias(nome)')
+            .select('descricao, valor, data_vencimento, conta:contas_bancarias(nome)'), userId)
             .eq('tipo_transacao', 'despesa')
             .neq('status', 'liquidado')
             .is('cartao_id', null)
             .lte('data_vencimento', futureDate)
             .order('data_vencimento', { ascending: true })
             .limit(50),
-        fetchCardsOverview(supabase, today)
+        fetchCardsOverview(supabase, today, userId)
     ])
 
     if (error) throw new Error(`Erro ao buscar contas: ${error.message}`)

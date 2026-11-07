@@ -1,6 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+/**
+ * Rotas chamadas por serviços externos, sem sessão: cada uma valida o próprio segredo
+ * (Telegram: X-Telegram-Bot-Api-Secret-Token; automações: Bearer AGENT_API_SECRET).
+ */
+const SECRET_AUTH_ROUTES = ['/api/telegram/webhook', '/api/agent/process']
+
 export async function proxy(request: NextRequest) {
     let response = NextResponse.next({
         request: {
@@ -39,7 +45,8 @@ export async function proxy(request: NextRequest) {
         !user &&
         !request.nextUrl.pathname.startsWith('/login') &&
         !request.nextUrl.pathname.startsWith('/register') &&
-        !request.nextUrl.pathname.startsWith('/auth')
+        !request.nextUrl.pathname.startsWith('/auth') &&
+        !SECRET_AUTH_ROUTES.includes(request.nextUrl.pathname)
     ) {
         // no user, potentially respond by redirecting the user to the login page
         const url = request.nextUrl.clone()

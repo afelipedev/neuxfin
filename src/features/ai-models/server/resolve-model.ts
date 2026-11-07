@@ -1,6 +1,6 @@
 import { createGroq } from '@ai-sdk/groq'
 import { createOpenAI } from '@ai-sdk/openai'
-import type { LanguageModel } from 'ai'
+import type { LanguageModel, TranscriptionModel } from 'ai'
 import { createAdminClient, ServerConfigError } from '@/lib/supabase/admin'
 import type { AIProvider, AIUsage } from '../services/providers'
 
@@ -65,6 +65,23 @@ export async function resolveModel(
     if (process.env.GROQ_API_KEY) return build('groq', 'openai/gpt-oss-20b', process.env.GROQ_API_KEY)
     if (process.env.OPENAI_API_KEY) return build('openai', 'gpt-4o-mini', process.env.OPENAI_API_KEY)
     throw new AIModelNotConfiguredError(target.usage)
+}
+
+/**
+ * Modelo de transcrição de áudio (Whisper) para o bot do Telegram.
+ * Usa a chave do modelo de chat do usuário (Groq → whisper-large-v3-turbo, OpenAI → whisper-1);
+ * sem modelo cadastrado, GROQ_API_KEY / OPENAI_API_KEY. Retorna null se não houver nenhuma.
+ */
+export async function resolveTranscriptionModel(userId: string): Promise<TranscriptionModel | null> {
+    const admin = createAdminClient()
+    const { data, error } = await admin.rpc('obter_modelo_ia', { p_usuario_id: userId, p_uso: 'chat', p_modelo_id: null })
+    if (error) throw error
+    const row = (data as ModelRow[] | null)?.[0]
+    if (row?.provedor === 'groq') return createGroq({ apiKey: row.api_key }).transcription('whisper-large-v3-turbo')
+    if (row?.provedor === 'openai') return createOpenAI({ apiKey: row.api_key }).transcription('whisper-1')
+    if (process.env.GROQ_API_KEY) return createGroq({ apiKey: process.env.GROQ_API_KEY }).transcription('whisper-large-v3-turbo')
+    if (process.env.OPENAI_API_KEY) return createOpenAI({ apiKey: process.env.OPENAI_API_KEY }).transcription('whisper-1')
+    return null
 }
 
 /** Mensagem segura para o usuário a partir de um erro do provedor. */

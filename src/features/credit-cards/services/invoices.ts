@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { dateInMonthClamped, formatDateToISO, parseLocalDate } from '@/lib/utils'
-import { fromCents, toCents, todayISO } from '@/features/bank-accounts/services/balances'
+import { fromCents, scopeToUser, toCents, todayISO } from '@/features/bank-accounts/services/balances'
 
 /**
  * Faturas de cartão de crédito (calculadas, não armazenadas).
@@ -264,23 +264,28 @@ export interface CardsOverview {
 }
 
 /** Cartões com faturas, limite usado e faturas pendentes. Uma consulta por tabela. */
-export async function fetchCardsOverview(supabase: SupabaseClient, today: string = todayISO()): Promise<CardsOverview> {
+export async function fetchCardsOverview(
+    supabase: SupabaseClient,
+    today: string = todayISO(),
+    /** Obrigatório com client service-role */
+    userId?: string
+): Promise<CardsOverview> {
     const [cardsRes, purchases, payments] = await Promise.all([
-        supabase.from('cartoes_credito').select('*').order('nome'),
+        scopeToUser(supabase.from('cartoes_credito').select('*'), userId).order('nome'),
         fetchAll<CardPurchase>((from, to) =>
-            supabase
+            scopeToUser(supabase
                 .from('transacoes')
                 .select('id, cartao_id, descricao, valor, data_vencimento, status, fatura_pagamento_id, parcela_atual, total_parcelas, categoria:categorias(nome)')
                 .not('cartao_id', 'is', null)
-                .eq('tipo_transacao', 'despesa')
+                .eq('tipo_transacao', 'despesa'), userId)
                 .order('id')
                 .range(from, to)
         ),
         fetchAll<InvoicePayment>((from, to) =>
-            supabase
+            scopeToUser(supabase
                 .from('faturas_pagamentos')
                 .select('id, cartao_id, competencia, conta_id, valor, saldo_restante, data_pagamento, estornado_em, conta:contas_bancarias(nome)')
-                .is('estornado_em', null)
+                .is('estornado_em', null), userId)
                 .order('id')
                 .range(from, to)
         )
