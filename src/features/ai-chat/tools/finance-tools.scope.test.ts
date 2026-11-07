@@ -5,6 +5,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }))
 
 import { getBalanceCore, getRecentTransactionsCore, getUpcomingBillsCore } from './finance-tools'
+import {
+    getBudgetsCore,
+    getCardsCore,
+    getSavingsCore,
+    getSpendingByCategoryCore,
+    getSubscriptionsCore,
+    markTransactionPaidCore,
+    searchTransactionsCore,
+} from './finance-insights'
 
 const USER = '11111111-2222-4333-8444-555555555555'
 
@@ -47,6 +56,13 @@ describe('funções *Core com client service-role', () => {
         ['get_balance', (c: SupabaseClient) => getBalanceCore(c, 11, 2026, USER)],
         ['get_recent_transactions', (c: SupabaseClient) => getRecentTransactionsCore(c, 5, 'todos', USER)],
         ['get_upcoming_bills', (c: SupabaseClient) => getUpcomingBillsCore(c, 7, USER)],
+        ['get_subscriptions', (c: SupabaseClient) => getSubscriptionsCore(c, 'todas', USER)],
+        ['get_credit_cards', (c: SupabaseClient) => getCardsCore(c, USER)],
+        ['get_savings', (c: SupabaseClient) => getSavingsCore(c, USER)],
+        ['get_budgets', (c: SupabaseClient) => getBudgetsCore(c, 11, 2026, USER)],
+        ['get_spending_by_category', (c: SupabaseClient) => getSpendingByCategoryCore(c, 11, 2026, 'despesa', USER)],
+        ['search_transactions', (c: SupabaseClient) => searchTransactionsCore(c, { busca: 'luz', categoria_nome: 'Casa', status: 'atrasado' }, USER)],
+        ['mark_transaction_paid', (c: SupabaseClient) => markTransactionPaidCore(c, USER, { transacao_id: '99999999-2222-4333-8444-555555555555' })],
     ])('%s filtra TODAS as consultas por usuario_id', async (_name, run) => {
         const { client, queries } = fakeClient()
         await run(client)

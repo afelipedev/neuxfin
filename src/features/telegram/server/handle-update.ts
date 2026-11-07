@@ -2,7 +2,7 @@ import { experimental_transcribe as transcribe } from 'ai'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { describeAIError, resolveTranscriptionModel } from '@/features/ai-models/server/resolve-model'
 import { getBalanceCore } from '@/features/ai-chat/tools/finance-tools'
-import { runFinanceAgent } from './agent'
+import { clearHistory, runFinanceAgent } from './agent'
 import { downloadFile, sendMessage, sendTyping } from './telegram-api'
 import {
     formatBalanceMessage,
@@ -67,6 +67,7 @@ async function handleCommand(admin: Admin, chatId: number, command: string, arg:
                 .eq('usuario_id', userId)
                 .eq('chat_id', chatId)
             if (error) throw error
+            await clearHistory(admin, userId)
             await sendMessage(chatId, 'Telegram desvinculado. Para usar de novo, vincule em Configurações → Telegram. 👋')
             return
         }
@@ -135,7 +136,7 @@ export async function handleUpdate(update: TelegramUpdate): Promise<void> {
         }
 
         await sendTyping(chatId)
-        const reply = await runFinanceAgent(admin, userId, text)
+        const reply = await runFinanceAgent(admin, userId, chatId, text)
         await sendMessage(chatId, reply)
     } catch (error) {
         console.error('[telegram] erro ao processar update', update.update_id, error)
