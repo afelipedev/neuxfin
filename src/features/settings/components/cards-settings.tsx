@@ -4,6 +4,7 @@ import { DataTablePagination, usePaginatedList } from "@/components/data-table-p
 import * as React from "react"
 import { Plus, Trash2, Edit, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { CardThumb, DEFAULT_CARD_COLOR } from "@/features/credit-cards/components/card-thumb"
 import { Card, CardContent } from "@/components/ui/card"
 import {
     Table,
@@ -50,7 +51,7 @@ export function CardsSettings() {
         limite: 0,
         dia_vencimento: 10,
         dia_fechamento: 3,
-        cor: "#6366f1", // Indigo
+        cor: DEFAULT_CARD_COLOR, // Indigo
     })
     const [deletingId, setDeletingId] = React.useState<string | null>(null)
     const [saving, setSaving] = React.useState(false)
@@ -87,7 +88,7 @@ export function CardsSettings() {
             }
             setIsDialogOpen(false)
             setEditingCard(null)
-            setFormData({ nome: "", bandeira: "Visa", limite: 0, dia_vencimento: 10, dia_fechamento: 3, cor: "#6366f1" })
+            setFormData({ nome: "", bandeira: "Visa", limite: 0, dia_vencimento: 10, dia_fechamento: 3, cor: DEFAULT_CARD_COLOR })
             fetchCards()
         } catch {
             toast.error(editingCard ? "Erro ao atualizar cartão" : "Erro ao cadastrar cartão", {
@@ -127,14 +128,14 @@ export function CardsSettings() {
             limite: card.limite,
             dia_vencimento: card.dia_vencimento,
             dia_fechamento: card.dia_fechamento,
-            cor: card.cor || "#6366f1",
+            cor: card.cor || DEFAULT_CARD_COLOR,
         })
         setIsDialogOpen(true)
     }
 
     const openCreateDialog = () => {
         setEditingCard(null)
-        setFormData({ nome: "", bandeira: "Visa", limite: 0, dia_vencimento: 10, dia_fechamento: 3, cor: "#6366f1" })
+        setFormData({ nome: "", bandeira: "Visa", limite: 0, dia_vencimento: 10, dia_fechamento: 3, cor: DEFAULT_CARD_COLOR })
         setIsDialogOpen(true)
     }
 
@@ -142,11 +143,11 @@ export function CardsSettings() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-bold">Cartões de Crédito</h2>
+                    <h2 className="text-lg font-semibold">Cartões de Crédito</h2>
                     <p className="text-sm text-muted-foreground">Gerencie seus limites e datas de fatura</p>
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <Button onClick={openCreateDialog} className="bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold w-full sm:w-auto justify-center">
+                    <Button onClick={openCreateDialog} className="w-full sm:w-auto justify-center">
                         <Plus className="mr-2 h-4 w-4" /> Novo Cartão
                     </Button>
                     <DialogContent className="sm:max-w-[500px]">
@@ -238,7 +239,7 @@ export function CardsSettings() {
                                     />
                                 </div>
                             </div>
-                            <Button type="submit" disabled={saving} className="w-full bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold">
+                            <Button type="submit" disabled={saving} className="w-full">
                                 {saving ? "Salvando..." : editingCard ? "Atualizar Cartão" : "Salvar Cartão"}
                             </Button>
                         </form>
@@ -246,16 +247,16 @@ export function CardsSettings() {
                 </Dialog>
             </div>
 
-            <Card className="border-none bg-zinc-900/5 dark:bg-zinc-100/5 shadow-none overflow-hidden">
+            <Card className="gap-0 overflow-hidden py-0">
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="font-medium text-xs h-10 px-6">Cartão</TableHead>
-                                <TableHead className="font-medium text-xs h-10">Bandeira</TableHead>
-                                <TableHead className="font-medium text-xs h-10">Datas (F/V)</TableHead>
-                                <TableHead className="font-medium text-xs h-10 text-right">Limite</TableHead>
-                                <TableHead className="font-medium text-xs h-10 text-right px-6">Ações</TableHead>
+                                <TableHead className="px-6">Cartão</TableHead>
+                                <TableHead >Bandeira</TableHead>
+                                <TableHead >Datas (F/V)</TableHead>
+                                <TableHead className="text-right">Limite</TableHead>
+                                <TableHead className="text-right px-6">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -273,20 +274,15 @@ export function CardsSettings() {
                                 </TableRow>
                             ) : (
                                 paged.pageItems.map((card) => (
-                                    <TableRow key={card.id} className="border-neux-1/5 hover:bg-zinc-900/5 dark:hover:bg-zinc-100/5 transition-colors">
+                                    <TableRow key={card.id} className="border-border hover:bg-muted transition-colors">
                                         <TableCell className="font-medium px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div
-                                                    className="w-10 h-6 rounded flex items-center justify-center text-[8px] font-black text-white/50"
-                                                    style={{ backgroundColor: card.cor || "#6366f1" }}
-                                                >
-                                                    CARD
-                                                </div>
-                                                <span className="font-bold">{card.nome}</span>
+                                                <CardThumb color={card.cor} brand={card.bandeira} size="sm" />
+                                                <span className="font-medium">{card.nome}</span>
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="ghost" className="bg-zinc-900/5 dark:bg-zinc-100/10 text-[10px] uppercase font-bold">
+                                            <Badge variant="secondary">
                                                 {card.bandeira || "Outra"}
                                             </Badge>
                                         </TableCell>
@@ -296,26 +292,28 @@ export function CardsSettings() {
                                                 <span>F: {card.dia_fechamento} / V: {card.dia_vencimento}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-right font-mono font-bold">
+                                        <TableCell className="text-right font-semibold tabular-nums">
                                             {formatCurrency(card.limite)}
                                         </TableCell>
                                         <TableCell className="text-right px-6">
                                             <div className="flex justify-end gap-1">
                                                 <Button
                                                     variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7 text-muted-foreground"
+                                                    size="icon-sm"
+                                                    className="text-muted-foreground"
                                                     onClick={() => openEditDialog(card)}
+                                                    aria-label={`Editar ${card.nome}`}
                                                 >
-                                                    <Edit className="h-3.5 w-3.5" />
+                                                    <Edit />
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7 text-rose-500"
+                                                    size="icon-sm"
+                                                    className="text-destructive"
                                                     onClick={() => setDeletingId(card.id)}
+                                                    aria-label={`Excluir ${card.nome}`}
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                    <Trash2 />
                                                 </Button>
                                             </div>
                                         </TableCell>
@@ -350,13 +348,13 @@ export function CardsSettings() {
                                 e.preventDefault()
                                 handleDelete()
                             }}
-                            className="bg-rose-500 hover:bg-rose-600 text-white"
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             Excluir
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div >
+        </div>
     )
 }

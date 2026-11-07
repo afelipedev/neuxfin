@@ -29,7 +29,8 @@ import {
 import { CategoryPieChart } from "@/features/dashboard/components/category-pie-chart"
 import { CashFlowChart } from "@/features/dashboard/components/cash-flow-chart"
 import { useInsights, useReport, type Insight } from "@/features/reports/hooks/use-report"
-import { cn, formatCurrency } from "@/lib/utils"
+import { cn, formatCurrency, parseLocalDate } from "@/lib/utils"
+import { IconTile, PageHeader, StatCard, StatGrid, type Tone } from "@/components/ds"
 
 const PERIODS = [3, 6, 12] as const
 type Period = (typeof PERIODS)[number]
@@ -38,22 +39,14 @@ const pct = (v: number | null) =>
     v === null ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`
 
 function Metric({ label, value, hint, tone }: { label: string; value: string; hint: string; tone: "good" | "warn" | "bad" | "neutral" }) {
-    const color = { good: "text-brand-1", warn: "text-amber-500", bad: "text-rose-500", neutral: "text-foreground" }[tone]
-    return (
-        <Card className="border-none glass-card">
-            <CardContent className="p-6 space-y-1">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{label}</p>
-                <p className={cn("text-3xl font-black tracking-tighter font-display tabular-nums", color)}>{value}</p>
-                <p className="text-[11px] text-muted-foreground">{hint}</p>
-            </CardContent>
-        </Card>
-    )
+    const map = { good: "success", warn: "warning", bad: "danger", neutral: "neutral" } as const
+    return <StatCard label={label} value={value} hint={hint} tone={map[tone]} />
 }
 
-const INSIGHT_STYLE: Record<Insight["tipo"], { Icon: typeof CheckCircle2; className: string }> = {
-    positivo: { Icon: CheckCircle2, className: "bg-brand-1/10 text-brand-1" },
-    atencao: { Icon: TriangleAlert, className: "bg-amber-500/10 text-amber-500" },
-    dica: { Icon: Lightbulb, className: "bg-sky-500/10 text-sky-500" },
+const INSIGHT_STYLE: Record<Insight["tipo"], { Icon: typeof CheckCircle2; tone: Tone }> = {
+    positivo: { Icon: CheckCircle2, tone: "success" },
+    atencao: { Icon: TriangleAlert, tone: "warning" },
+    dica: { Icon: Lightbulb, tone: "info" },
 }
 
 export default function RelatoriosPage() {
@@ -66,51 +59,43 @@ export default function RelatoriosPage() {
     const auto = data?.autonomia_meses ?? null
 
     return (
-        <div className="space-y-8 max-w-[1600px] mx-auto pb-12">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                    <h1 className="text-4xl font-black tracking-tighter font-display">Relatórios</h1>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-black">
-                        Saúde financeira dos últimos {months} meses
-                    </p>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
-                    <div className="flex rounded-xl border border-border bg-secondary/30 p-1" role="group" aria-label="Período">
-                        {PERIODS.map(p => (
-                            <Button
-                                key={p}
-                                size="sm"
-                                variant={months === p ? "default" : "ghost"}
-                                aria-pressed={months === p}
-                                className="h-8 flex-1 sm:flex-none text-xs"
-                                onClick={() => setMonths(p)}
-                            >
-                                {p} meses
-                            </Button>
-                        ))}
-                    </div>
-                    <Button
-                        onClick={() => ai.generate(months)}
-                        disabled={ai.loading || loading || !data}
-                        className="bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold w-full sm:w-auto"
-                    >
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        {ai.loading ? "Analisando..." : ai.insights ? "Gerar nova análise" : "Análise com IA"}
-                    </Button>
-                </div>
-            </div>
+        <div className="space-y-6 sm:space-y-8">
+            <PageHeader
+                title="Relatórios"
+                description={`Saúde financeira dos últimos ${months} meses`}
+                actions={
+                    <>
+                        <div className="flex h-10 rounded-lg border bg-card p-1" role="group" aria-label="Período">
+                            {PERIODS.map(p => (
+                                <Button
+                                    key={p}
+                                    size="sm"
+                                    variant={months === p ? "secondary" : "ghost"}
+                                    aria-pressed={months === p}
+                                    className="h-full flex-1 sm:flex-none"
+                                    onClick={() => setMonths(p)}
+                                >
+                                    {p} meses
+                                </Button>
+                            ))}
+                        </div>
+                        <Button onClick={() => ai.generate(months)} disabled={ai.loading || loading || !data}>
+                            <Sparkles />
+                            {ai.loading ? "Analisando..." : ai.insights ? "Gerar nova análise" : "Análise com IA"}
+                        </Button>
+                    </>
+                }
+            />
 
-            {error && <p className="text-sm text-rose-500">{error}</p>}
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
             {(ai.insights || ai.loading || ai.error) && (
-                <Card className="border-none bg-gradient-to-r from-brand-1/10 via-brand-1/5 to-transparent shadow-none">
+                <Card className="border-brand-2/20 bg-brand-2/5">
                     <CardContent className="p-6 space-y-4">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-brand-1 flex items-center justify-center shrink-0">
-                                <BrainCircuit className="h-5 w-5 text-zinc-950" />
-                            </div>
+                            <IconTile icon={BrainCircuit} tone="secondary" />
                             <div>
-                                <h3 className="font-bold">Análise da IA</h3>
+                                <h3 className="font-semibold">Análise da IA</h3>
                                 <p className="text-xs text-muted-foreground">Baseada apenas nos totais do período; não substitui orientação profissional.</p>
                             </div>
                         </div>
@@ -119,7 +104,7 @@ export default function RelatoriosPage() {
                                 {[1, 2].map(i => <Skeleton key={i} className="h-20 rounded-2xl" />)}
                             </div>
                         ) : ai.error ? (
-                            <div className="text-sm text-rose-500">
+                            <div role="alert" className="text-sm text-destructive">
                                 <p>{ai.error}</p>
                                 {ai.error.includes("Configurações") && (
                                     <Link href="/configuracoes?tab=ia" className="mt-1 inline-block font-semibold underline">
@@ -132,12 +117,10 @@ export default function RelatoriosPage() {
                                 {ai.insights?.map((insight, i) => {
                                     const style = INSIGHT_STYLE[insight.tipo]
                                     return (
-                                        <div key={i} className="flex gap-3 rounded-2xl bg-background/60 p-4">
-                                            <span className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", style.className)}>
-                                                <style.Icon className="h-4 w-4" />
-                                            </span>
+                                        <div key={i} className="flex gap-3 rounded-xl border bg-card p-4">
+                                            <IconTile icon={style.Icon} tone={style.tone} size="sm" />
                                             <div className="space-y-1 min-w-0">
-                                                <p className="text-sm font-bold">{insight.titulo}</p>
+                                                <p className="text-sm font-semibold">{insight.titulo}</p>
                                                 <p className="text-xs text-muted-foreground leading-relaxed">{insight.descricao}</p>
                                             </div>
                                         </div>
@@ -150,12 +133,12 @@ export default function RelatoriosPage() {
             )}
 
             {loading && !data ? (
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 rounded-3xl" />)}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}
                 </div>
             ) : data && (
                 <>
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                    <StatGrid columns={4}>
                         <Metric
                             label="Resultado do período"
                             value={formatCurrency(data.resultado)}
@@ -180,25 +163,25 @@ export default function RelatoriosPage() {
                             hint={`Saldo + cofrinhos ÷ despesa média (${formatCurrency(data.despesa_media_mensal)}/mês)`}
                             tone={auto === null ? "neutral" : auto >= 6 ? "good" : auto >= 3 ? "warn" : "bad"}
                         />
-                    </div>
+                    </StatGrid>
 
                     <div className="grid gap-6 lg:grid-cols-2">
-                        <Card className="border-none glass-card shadow-none overflow-hidden">
+                        <Card className="overflow-hidden">
                             <CardHeader>
-                                <CardTitle className="text-base font-bold">Receitas x despesas por mês</CardTitle>
+                                <CardTitle className="text-base">Receitas x despesas por mês</CardTitle>
                                 <CardDescription>Por competência (data de vencimento)</CardDescription>
                             </CardHeader>
-                            <CardContent className="h-[260px] sm:h-[320px] lg:h-[350px]">
+                            <CardContent className="h-[240px] sm:h-[300px] lg:h-[340px]">
                                 <CashFlowChart data={data.months} loading={loading} />
                             </CardContent>
                         </Card>
 
-                        <Card className="border-none glass-card shadow-none overflow-hidden">
+                        <Card className="overflow-hidden">
                             <CardHeader>
-                                <CardTitle className="text-base font-bold">Distribuição de gastos</CardTitle>
+                                <CardTitle className="text-base">Distribuição de gastos</CardTitle>
                                 <CardDescription>Despesas por categoria no período</CardDescription>
                             </CardHeader>
-                            <CardContent className="h-[260px] sm:h-[320px] lg:h-[350px]">
+                            <CardContent className="h-[240px] sm:h-[300px] lg:h-[340px]">
                                 {data.categorias.length > 0 ? (
                                     <CategoryPieChart data={data.categorias} />
                                 ) : (
@@ -209,9 +192,9 @@ export default function RelatoriosPage() {
                     </div>
 
                     <div className="grid gap-6 lg:grid-cols-3">
-                        <Card className="border-none glass-card shadow-none overflow-hidden lg:col-span-2">
+                        <Card className="overflow-hidden lg:col-span-2">
                             <CardHeader>
-                                <CardTitle className="text-base font-bold">Maiores categorias de gasto</CardTitle>
+                                <CardTitle className="text-base">Maiores categorias de gasto</CardTitle>
                                 <CardDescription>Variação: último mês do período vs o anterior</CardDescription>
                             </CardHeader>
                             <CardContent className="px-0 pt-0">
@@ -219,10 +202,10 @@ export default function RelatoriosPage() {
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead className="px-6 text-[10px] font-black uppercase tracking-widest">Categoria</TableHead>
-                                                <TableHead className="text-right text-[10px] font-black uppercase tracking-widest">Total</TableHead>
-                                                <TableHead className="text-right text-[10px] font-black uppercase tracking-widest">% do total</TableHead>
-                                                <TableHead className="text-right px-6 text-[10px] font-black uppercase tracking-widest">Variação</TableHead>
+                                                <TableHead className="px-6">Categoria</TableHead>
+                                                <TableHead className="text-right">Total</TableHead>
+                                                <TableHead className="text-right">% do total</TableHead>
+                                                <TableHead className="px-6 text-right">Variação</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -246,7 +229,7 @@ export default function RelatoriosPage() {
                                                         {c.variacao === null ? (
                                                             <span className="text-muted-foreground">—</span>
                                                         ) : (
-                                                            <span className={cn("inline-flex items-center gap-1 font-bold", c.variacao > 0 ? "text-rose-500" : "text-brand-1")}>
+                                                            <span className={cn("inline-flex items-center gap-1 font-bold", c.variacao > 0 ? "text-destructive" : "text-brand-1")}>
                                                                 {c.variacao > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
                                                                 {pct(Math.abs(c.variacao))}
                                                             </span>
@@ -260,9 +243,9 @@ export default function RelatoriosPage() {
                             </CardContent>
                         </Card>
 
-                        <Card className="border-none glass-card shadow-none">
+                        <Card>
                             <CardHeader>
-                                <CardTitle className="text-base font-bold">PF x PJ</CardTitle>
+                                <CardTitle className="text-base">PF x PJ</CardTitle>
                                 <CardDescription>Totais do período por perfil</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -270,13 +253,13 @@ export default function RelatoriosPage() {
                                     const r = data.months.reduce((acc, m) => acc + m[perfil].receitas, 0)
                                     const d = data.months.reduce((acc, m) => acc + m[perfil].despesas, 0)
                                     return (
-                                        <div key={perfil} className="rounded-2xl bg-secondary/40 p-4 space-y-2">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                        <div key={perfil} className="rounded-xl bg-muted/60 p-4 space-y-2">
+                                            <p className="eyebrow">
                                                 {perfil === "pf" ? "Pessoa Física" : "Pessoa Jurídica"}
                                             </p>
-                                            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Receitas</span><span className="font-bold text-brand-2 tabular-nums">{formatCurrency(r)}</span></div>
-                                            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Despesas</span><span className="font-bold text-rose-500 tabular-nums">{formatCurrency(d)}</span></div>
-                                            <div className="flex justify-between text-sm border-t border-border pt-2"><span className="text-muted-foreground">Resultado</span><span className={cn("font-black tabular-nums", r - d >= 0 ? "text-brand-1" : "text-rose-500")}>{formatCurrency(r - d)}</span></div>
+                                            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Receitas</span><span className="font-bold text-success tabular-nums">{formatCurrency(r)}</span></div>
+                                            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Despesas</span><span className="font-bold text-destructive tabular-nums">{formatCurrency(d)}</span></div>
+                                            <div className="flex justify-between text-sm border-t border-border pt-2"><span className="text-muted-foreground">Resultado</span><span className={cn("font-bold tabular-nums", r - d >= 0 ? "text-brand-1" : "text-destructive")}>{formatCurrency(r - d)}</span></div>
                                         </div>
                                     )
                                 })}
@@ -284,10 +267,10 @@ export default function RelatoriosPage() {
                         </Card>
                     </div>
 
-                    <Card className="border-none glass-card shadow-none">
+                    <Card>
                         <CardHeader className="flex flex-row items-center justify-between gap-4">
                             <div>
-                                <CardTitle className="text-base font-bold">Metas dos cofrinhos</CardTitle>
+                                <CardTitle className="text-base">Metas dos cofrinhos</CardTitle>
                                 <CardDescription>
                                     Total guardado: {formatCurrency(data.total_cofrinhos)}
                                 </CardDescription>
@@ -300,16 +283,16 @@ export default function RelatoriosPage() {
                             ) : (
                                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                                     {data.cofrinhos.map(c => (
-                                        <div key={c.nome} className="rounded-2xl bg-secondary/40 p-4 space-y-2">
+                                        <div key={c.nome} className="rounded-xl bg-muted/60 p-4 space-y-2">
                                             <div className="flex items-center gap-2">
                                                 <Target className="h-4 w-4 text-brand-1 shrink-0" />
                                                 <p className="font-bold text-sm truncate">{c.nome}</p>
-                                                <span className="ml-auto text-xs font-black tabular-nums">{c.progresso}%</span>
+                                                <span className="ml-auto text-xs font-bold tabular-nums">{c.progresso}%</span>
                                             </div>
-                                            <Progress value={c.progresso} aria-label={`${c.nome}: ${c.progresso}% da meta`} className="bg-secondary" indicatorClassName="bg-brand-1" />
-                                            <p className="text-[11px] text-muted-foreground">
+                                            <Progress value={c.progresso} aria-label={`${c.nome}: ${c.progresso}% da meta`} className="bg-background" indicatorClassName="bg-primary" />
+                                            <p className="text-xs text-muted-foreground">
                                                 {formatCurrency(c.saldo)} de {formatCurrency(c.objetivo)}
-                                                {c.data_prevista && ` · meta para ${format(new Date(c.data_prevista), "MMM/yyyy", { locale: ptBR })}`}
+                                                {c.data_prevista && ` · meta para ${format(parseLocalDate(c.data_prevista), "MMM/yyyy", { locale: ptBR })}`}
                                             </p>
                                         </div>
                                     ))}

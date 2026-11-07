@@ -4,6 +4,7 @@ import * as React from "react"
 import { Bot, Edit, KeyRound, Loader2, MessageSquare, Plus, Trash2, Zap, BarChart3, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { ToneBadge } from "@/components/ds"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -144,34 +145,34 @@ export function AIModelsSettings() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-bold">Modelos de IA</h2>
+                    <h2 className="text-lg font-semibold">Modelos de IA</h2>
                     <p className="text-sm text-muted-foreground">
                         Escolha o provedor e o modelo usados pelo Amigão e pela análise de relatórios
                     </p>
                 </div>
-                <Button onClick={openCreate} className="bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold w-full sm:w-auto justify-center">
+                <Button onClick={openCreate} className="w-full sm:w-auto justify-center">
                     <Plus className="mr-2 h-4 w-4" /> Novo Modelo
                 </Button>
             </div>
 
             {(missingChat || missingAnalise) && (
-                <div role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-400">
+                <div role="status" className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
                     {models.length === 0
                         ? "Nenhum modelo cadastrado: o chat e a análise com IA ficam indisponíveis até você adicionar um."
                         : `Nenhum modelo marcado para ${[missingChat && "o chat", missingAnalise && "a análise"].filter(Boolean).join(" e ")}. Edite um modelo e marque o uso.`}
                 </div>
             )}
 
-            <Card className="border-none bg-zinc-900/5 dark:bg-zinc-100/5 shadow-none overflow-hidden">
+            <Card className="gap-0 overflow-hidden py-0">
                 <CardContent className="p-0 overflow-x-auto">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="font-medium text-xs h-10 px-6">Modelo</TableHead>
-                                <TableHead className="font-medium text-xs h-10">Provedor</TableHead>
-                                <TableHead className="font-medium text-xs h-10">API key</TableHead>
-                                <TableHead className="font-medium text-xs h-10">Uso</TableHead>
-                                <TableHead className="font-medium text-xs h-10 text-right px-6">Ações</TableHead>
+                                <TableHead className="px-6">Modelo</TableHead>
+                                <TableHead >Provedor</TableHead>
+                                <TableHead >API key</TableHead>
+                                <TableHead >Uso</TableHead>
+                                <TableHead className="text-right px-6">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -184,28 +185,28 @@ export function AIModelsSettings() {
                                     <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Nenhum modelo cadastrado.</TableCell>
                                 </TableRow>
                             ) : models.map(model => (
-                                <TableRow key={model.id} className="hover:bg-zinc-900/5 dark:hover:bg-zinc-100/5 transition-colors">
+                                <TableRow key={model.id} className="hover:bg-muted transition-colors">
                                     <TableCell className="px-6 py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-1/15 text-brand-1">
                                                 <Bot className="h-4 w-4" />
                                             </div>
                                             <div>
-                                                <p className="font-bold">{model.nome}</p>
+                                                <p className="font-medium">{model.nome}</p>
                                                 <p className="font-mono text-xs text-muted-foreground">{model.modelo}</p>
                                             </div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant="outline" className="text-[10px] uppercase font-bold">{providerLabel(model.provedor)}</Badge>
+                                        <Badge variant="outline">{providerLabel(model.provedor)}</Badge>
                                     </TableCell>
                                     <TableCell className="font-mono text-xs text-muted-foreground">
                                         <span className="inline-flex items-center gap-1"><KeyRound className="h-3 w-3" />••••{model.chave_final}</span>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1">
-                                            {model.usar_chat && <Badge className="bg-brand-1/15 text-foreground border-none text-[10px]"><MessageSquare className="mr-1 h-3 w-3" />Chat</Badge>}
-                                            {model.usar_analise && <Badge className="bg-brand-3/20 text-foreground border-none text-[10px]"><BarChart3 className="mr-1 h-3 w-3" />Análise</Badge>}
+                                            {model.usar_chat && <ToneBadge tone="brand"><MessageSquare />Chat</ToneBadge>}
+                                            {model.usar_analise && <ToneBadge tone="secondary"><BarChart3 />Análise</ToneBadge>}
                                             {!model.usar_chat && !model.usar_analise && <span className="text-xs text-muted-foreground">Sem uso</span>}
                                         </div>
                                     </TableCell>
@@ -219,10 +220,10 @@ export function AIModelsSettings() {
                                                 {testingId === model.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Zap className="mr-1 h-3.5 w-3.5" />}
                                                 Testar
                                             </Button>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" aria-label={`Editar ${model.nome}`} onClick={() => openEdit(model)}>
+                                            <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={`Editar ${model.nome}`} onClick={() => openEdit(model)}>
                                                 <Edit className="h-3.5 w-3.5" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" aria-label={`Remover ${model.nome}`} onClick={() => setDeleting(model)}>
+                                            <Button variant="ghost" size="icon-sm" className="text-destructive" aria-label={`Remover ${model.nome}`} onClick={() => setDeleting(model)}>
                                                 <Trash2 className="h-3.5 w-3.5" />
                                             </Button>
                                         </div>
@@ -330,7 +331,7 @@ export function AIModelsSettings() {
                             <p className="text-xs text-muted-foreground">Cada uso tem um modelo só: marcar aqui desmarca o modelo anterior.</p>
                         </fieldset>
 
-                        <Button type="submit" disabled={saving} className="w-full bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold">
+                        <Button type="submit" disabled={saving} className="w-full">
                             {saving ? "Salvando..." : editing ? "Atualizar modelo" : "Salvar e testar"}
                         </Button>
                     </form>
@@ -350,7 +351,7 @@ export function AIModelsSettings() {
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={(e) => { e.preventDefault(); handleDelete() }}
-                            className="bg-rose-500 hover:bg-rose-600 text-white"
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             Remover
                         </AlertDialogAction>

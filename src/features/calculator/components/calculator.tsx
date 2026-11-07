@@ -9,6 +9,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { IconTile } from "@/components/ds"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -196,42 +197,40 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="w-[95vw] sm:max-w-[900px] max-h-[85vh] p-0 overflow-hidden border-none glass-card shadow-2xl">
+            <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-[900px]">
                 <DialogHeader className="p-4 pb-2">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded-lg bg-brand-1 flex items-center justify-center text-zinc-950 shadow-lg shadow-brand-1/20">
-                                <Calculator className="h-4 w-4" />
-                            </div>
-                            <DialogTitle className="text-lg font-black tracking-tighter text-foreground font-display">
+                            <IconTile icon={Calculator} size="sm" />
+                            <DialogTitle className="text-lg">
                                 Calculadora Inteligente
                             </DialogTitle>
                         </div>
                     </div>
                 </DialogHeader>
 
-                <div className="px-4 pb-4 overflow-y-auto max-h-[calc(85vh-100px)]">
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
                     {/* Display */}
                     <div className="bg-secondary/50 rounded-xl p-4 mb-4 border border-border relative group overflow-hidden">
-                        <div className="text-3xl font-black text-foreground text-right font-display tracking-tighter">
+                        <div className="text-3xl font-bold text-foreground text-right font-display tracking-tight">
                             {display}
                         </div>
-                        <div className="absolute -left-1 top-1/2 -translate-y-1/2 h-8 w-1 bg-brand-1 rounded-full" />
+                        <div className="absolute -left-1 top-1/2 -translate-y-1/2 h-8 w-1 bg-primary rounded-full" />
                     </div>
 
                     {/* Tabs */}
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 bg-secondary/50 p-1 rounded-xl mb-4">
+                        <TabsList className="mb-4 grid w-full grid-cols-2">
                             <TabsTrigger
                                 value="quick"
-                                className="rounded-lg data-[state=active]:bg-brand-1 data-[state=active]:text-zinc-950 transition-all font-bold flex items-center gap-2"
+                                className="gap-2"
                             >
                                 <TrendingUp className="h-4 w-4" />
                                 Acesso Rápido
                             </TabsTrigger>
                             <TabsTrigger
                                 value="selector"
-                                className="rounded-lg data-[state=active]:bg-brand-1 data-[state=active]:text-zinc-950 transition-all font-bold flex items-center gap-2"
+                                className="gap-2"
                             >
                                 <Filter className="h-4 w-4" />
                                 Seletor de Dados
@@ -242,41 +241,41 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                         <TabsContent value="quick" className="space-y-2 outline-none">
                             <div>
                                 <div className="flex items-center justify-between mb-2">
-                                    <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+                                    <h3 className="eyebrow">
                                         Dados do Mês Atual
                                     </h3>
-                                    <div className="text-[10px] text-muted-foreground">
+                                    <div className="text-2xs text-muted-foreground">
                                         {months[currentDate.getMonth()]} {currentDate.getFullYear()}
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2">
                                     {/* Receitas do Mês */}
-                                    <div className="bg-brand-2/5 border border-brand-2/20 rounded-md p-2 hover:bg-brand-2/10 transition-all cursor-pointer group" onClick={() => insertValue(stats.total_receitas)}>
+                                    <div className="bg-success/5 border border-success/20 rounded-md p-2 hover:bg-success/10 transition-all cursor-pointer group" onClick={() => insertValue(stats.total_receitas)}>
                                         <div className="flex items-center gap-1 mb-1">
-                                            <div className="h-5 w-5 rounded bg-brand-2/20 flex items-center justify-center">
-                                                <TrendingUp className="h-2.5 w-2.5 text-brand-2" />
+                                            <div className="h-5 w-5 rounded bg-success/20 flex items-center justify-center">
+                                                <TrendingUp className="h-2.5 w-2.5 text-success" />
                                             </div>
-                                            <span className="text-[9px] font-bold uppercase tracking-tight text-muted-foreground">
+                                            <span className="eyebrow">
                                                 Receitas
                                             </span>
                                         </div>
-                                        <div className="text-sm font-black text-foreground font-display">
+                                        <div className="text-sm font-bold text-foreground font-display">
                                             {formatCurrency(stats.total_receitas)}
                                         </div>
                                     </div>
 
                                     {/* Despesas do Mês */}
-                                    <div className="bg-rose-500/5 border border-rose-500/20 rounded-md p-2 hover:bg-rose-500/10 transition-all cursor-pointer group" onClick={() => insertValue(stats.total_despesas)}>
+                                    <div className="bg-destructive/5 border border-destructive/20 rounded-md p-2 hover:bg-destructive/10 transition-all cursor-pointer group" onClick={() => insertValue(stats.total_despesas)}>
                                         <div className="flex items-center gap-1 mb-1">
-                                            <div className="h-5 w-5 rounded bg-rose-500/20 flex items-center justify-center">
-                                                <TrendingDown className="h-2.5 w-2.5 text-rose-500" />
+                                            <div className="h-5 w-5 rounded bg-destructive/20 flex items-center justify-center">
+                                                <TrendingDown className="h-2.5 w-2.5 text-destructive" />
                                             </div>
-                                            <span className="text-[9px] font-bold uppercase tracking-tight text-muted-foreground">
+                                            <span className="eyebrow">
                                                 Despesas
                                             </span>
                                         </div>
-                                        <div className="text-sm font-black text-foreground font-display">
+                                        <div className="text-sm font-bold text-foreground font-display">
                                             {formatCurrency(stats.total_despesas)}
                                         </div>
                                     </div>
@@ -287,41 +286,41 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                             <div className="h-5 w-5 rounded bg-brand-1/20 flex items-center justify-center">
                                                 <Wallet className="h-2.5 w-2.5 text-brand-1" />
                                             </div>
-                                            <span className="text-[9px] font-bold uppercase tracking-tight text-muted-foreground">
+                                            <span className="eyebrow">
                                                 Saldo
                                             </span>
                                         </div>
-                                        <div className="text-sm font-black text-foreground font-display">
+                                        <div className="text-sm font-bold text-foreground font-display">
                                             {formatCurrency(stats.saldo_atual)}
                                         </div>
                                     </div>
 
                                     {/* Receitas Recebidas */}
-                                    <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-md p-2 hover:bg-emerald-500/10 transition-all cursor-pointer group" onClick={() => insertValue(receitasRecebidas)}>
+                                    <div className="bg-success/5 border border-success/20 rounded-md p-2 hover:bg-success/10 transition-all cursor-pointer group" onClick={() => insertValue(receitasRecebidas)}>
                                         <div className="flex items-center gap-1 mb-1">
-                                            <div className="h-5 w-5 rounded bg-emerald-500/20 flex items-center justify-center">
-                                                <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />
+                                            <div className="h-5 w-5 rounded bg-success/20 flex items-center justify-center">
+                                                <CheckCircle2 className="h-2.5 w-2.5 text-success" />
                                             </div>
-                                            <span className="text-[9px] font-bold uppercase tracking-tight text-muted-foreground">
+                                            <span className="eyebrow">
                                                 Recebidas
                                             </span>
                                         </div>
-                                        <div className="text-sm font-black text-foreground font-display">
+                                        <div className="text-sm font-bold text-foreground font-display">
                                             {formatCurrency(receitasRecebidas)}
                                         </div>
                                     </div>
 
                                     {/* Despesas Pagas */}
-                                    <div className="bg-amber-500/5 border border-amber-500/20 rounded-md p-2 hover:bg-amber-500/10 transition-all cursor-pointer group col-span-2" onClick={() => insertValue(despesasPagas)}>
+                                    <div className="bg-warning/5 border border-warning/20 rounded-md p-2 hover:bg-warning/10 transition-all cursor-pointer group col-span-2" onClick={() => insertValue(despesasPagas)}>
                                         <div className="flex items-center gap-1 mb-1">
-                                            <div className="h-5 w-5 rounded bg-amber-500/20 flex items-center justify-center">
-                                                <CheckCircle2 className="h-2.5 w-2.5 text-amber-500" />
+                                            <div className="h-5 w-5 rounded bg-warning/20 flex items-center justify-center">
+                                                <CheckCircle2 className="h-2.5 w-2.5 text-warning" />
                                             </div>
-                                            <span className="text-[9px] font-bold uppercase tracking-tight text-muted-foreground">
+                                            <span className="eyebrow">
                                                 Pagas
                                             </span>
                                         </div>
-                                        <div className="text-sm font-black text-foreground font-display">
+                                        <div className="text-sm font-bold text-foreground font-display">
                                             {formatCurrency(despesasPagas)}
                                         </div>
                                     </div>
@@ -330,7 +329,7 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
 
                             {/* Calculadora */}
                             <div className="mt-1">
-                                <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-2">
+                                <h3 className="eyebrow mb-2">
                                     Calculadora
                                 </h3>
                                 <div className="grid grid-cols-4 gap-2">
@@ -339,7 +338,7 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                             key={btn}
                                             variant="ghost"
                                             className={cn(
-                                                "h-10 rounded-lg text-base font-black transition-all font-display",
+                                                "h-11 rounded-lg text-base font-semibold tabular-nums transition-colors",
                                                 "bg-secondary/50 hover:bg-secondary border border-border text-foreground"
                                             )}
                                             onClick={() => handleButtonClick(btn === '÷' ? '/' : btn)}
@@ -352,9 +351,9 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                             key={btn}
                                             variant="ghost"
                                             className={cn(
-                                                "h-10 rounded-lg text-base font-black transition-all font-display",
+                                                "h-11 rounded-lg text-base font-semibold tabular-nums transition-colors",
                                                 btn === 'x'
-                                                    ? "bg-amber-500/10 hover:bg-amber-500 hover:text-zinc-950 text-amber-500 border border-amber-500/20"
+                                                    ? "bg-warning/10 hover:bg-warning hover:text-warning-foreground text-warning border border-warning/20"
                                                     : "bg-secondary/50 hover:bg-secondary border border-border text-foreground"
                                             )}
                                             onClick={() => handleButtonClick(btn)}
@@ -367,9 +366,9 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                             key={btn}
                                             variant="ghost"
                                             className={cn(
-                                                "h-10 rounded-lg text-base font-black transition-all font-display",
+                                                "h-11 rounded-lg text-base font-semibold tabular-nums transition-colors",
                                                 btn === '-'
-                                                    ? "bg-amber-500/10 hover:bg-amber-500 hover:text-zinc-950 text-amber-500 border border-amber-500/20"
+                                                    ? "bg-warning/10 hover:bg-warning hover:text-warning-foreground text-warning border border-warning/20"
                                                     : "bg-secondary/50 hover:bg-secondary border border-border text-foreground"
                                             )}
                                             onClick={() => handleButtonClick(btn)}
@@ -382,9 +381,9 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                             key={btn}
                                             variant="ghost"
                                             className={cn(
-                                                "h-10 rounded-lg text-base font-black transition-all font-display",
+                                                "h-11 rounded-lg text-base font-semibold tabular-nums transition-colors",
                                                 btn === '+'
-                                                    ? "bg-amber-500/10 hover:bg-amber-500 hover:text-zinc-950 text-amber-500 border border-amber-500/20"
+                                                    ? "bg-warning/10 hover:bg-warning hover:text-warning-foreground text-warning border border-warning/20"
                                                     : "bg-secondary/50 hover:bg-secondary border border-border text-foreground"
                                             )}
                                             onClick={() => handleButtonClick(btn)}
@@ -394,27 +393,27 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                     ))}
                                     <Button
                                         variant="ghost"
-                                        className="h-10 rounded-lg text-base font-black transition-all font-display bg-secondary/50 hover:bg-secondary border border-border text-foreground col-span-2"
+                                        className="h-11 rounded-lg text-base font-semibold tabular-nums transition-colors bg-secondary/50 hover:bg-secondary border border-border text-foreground col-span-2"
                                         onClick={() => handleButtonClick('00')}
                                     >
                                         00
                                     </Button>
                                     <Button
                                         variant="ghost"
-                                        className="h-10 rounded-lg text-base font-black transition-all font-display bg-secondary/50 hover:bg-secondary border border-border text-foreground"
+                                        className="h-11 rounded-lg text-base font-semibold tabular-nums transition-colors bg-secondary/50 hover:bg-secondary border border-border text-foreground"
                                         onClick={() => handleButtonClick('0')}
                                     >
                                         0
                                     </Button>
                                     <Button
                                         variant="ghost"
-                                        className="h-10 rounded-lg text-base font-black transition-all font-display bg-secondary/50 hover:bg-secondary border border-border text-foreground"
+                                        className="h-11 rounded-lg text-base font-semibold tabular-nums transition-colors bg-secondary/50 hover:bg-secondary border border-border text-foreground"
                                         onClick={() => handleButtonClick(',')}
                                     >
                                         ,
                                     </Button>
                                     <Button
-                                        className="h-10 rounded-lg text-base font-black transition-all font-display bg-brand-1 hover:bg-brand-2 text-zinc-950 col-span-4 shadow-lg shadow-brand-1/20"
+                                        className="h-11 rounded-lg text-base font-semibold tabular-nums transition-colors bg-primary hover:bg-primary/90 text-primary-foreground col-span-4 shadow-lg"
                                         onClick={() => handleButtonClick('=')}
                                     >
                                         =
@@ -433,7 +432,7 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                     className={cn(
                                         "h-12 rounded-xl font-bold transition-all",
                                         filterType === 'despesa'
-                                            ? "bg-rose-500 hover:bg-rose-600 text-white"
+                                            ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                             : "border-border hover:bg-secondary"
                                     )}
                                     onClick={() => setFilterType('despesa')}
@@ -446,7 +445,7 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                     className={cn(
                                         "h-12 rounded-xl font-bold transition-all",
                                         filterType === 'receita'
-                                            ? "bg-brand-2 hover:bg-brand-2/90 text-zinc-950"
+                                            ? "bg-primary/90 hover:bg-success/90 text-primary-foreground"
                                             : "border-border hover:bg-secondary"
                                     )}
                                     onClick={() => setFilterType('receita')}
@@ -548,7 +547,7 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => setSelectedItems(new Set())}
-                                            className="text-xs font-bold text-rose-500"
+                                            className="text-xs font-bold text-destructive"
                                         >
                                             Limpar ({selectedItems.size})
                                         </Button>
@@ -580,8 +579,8 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                             </div>
                                         </div>
                                         <div className={cn(
-                                            "font-black text-sm",
-                                            transaction.tipo_transacao === 'receita' ? 'text-brand-2' : 'text-rose-500'
+                                            "font-bold text-sm",
+                                            transaction.tipo_transacao === 'receita' ? 'text-success' : 'text-destructive'
                                         )}>
                                             {formatCurrency(Number(transaction.valor))}
                                         </div>
@@ -593,13 +592,13 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                             <div className="space-y-3 pt-4 border-t border-border">
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm text-muted-foreground">Total filtrado:</span>
-                                    <span className="text-lg font-black text-foreground font-display">
+                                    <span className="text-lg font-bold text-foreground font-display">
                                         {formatCurrency(totalFiltered)}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm text-muted-foreground">Total selecionado ({selectedItems.size}):</span>
-                                    <span className="text-lg font-black text-foreground font-display">
+                                    <span className="text-lg font-bold text-foreground font-display">
                                         {formatCurrency(totalSelected)}
                                     </span>
                                 </div>
@@ -614,7 +613,7 @@ export function IntelligentCalculator({ isOpen, onOpenChange }: CalculatorProps)
                                         Usar Total Filtrado
                                     </Button>
                                     <Button
-                                        className="h-12 rounded-xl bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold shadow-lg shadow-brand-1/20"
+                                        className="h-12 rounded-xl shadow-lg"
                                         onClick={() => insertValue(totalSelected)}
                                         disabled={selectedItems.size === 0}
                                     >

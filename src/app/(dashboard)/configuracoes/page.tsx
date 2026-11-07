@@ -9,16 +9,17 @@ import { AccountsSettings } from "@/features/settings/components/accounts-settin
 import { CardsSettings } from "@/features/settings/components/cards-settings"
 import { ProfileSettings } from "@/features/settings/components/profile-settings"
 import { AIModelsSettings } from "@/features/ai-models/components/ai-models-settings"
+import { PageHeader } from "@/components/ds"
 
 const TABS = [
     { value: "categorias", label: "Categorias", icon: Tag },
-    { value: "contas", label: "Contas Bancárias", icon: Landmark },
-    { value: "cartoes", label: "Cartões de Crédito", icon: CreditCard },
+    { value: "contas", label: "Contas", icon: Landmark },
+    { value: "cartoes", label: "Cartões", icon: CreditCard },
     { value: "ia", label: "IA", icon: Sparkles },
     { value: "perfil", label: "Perfil", icon: User },
 ] as const
 
-const triggerClass = "flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 sm:px-6 transition-all"
+const triggerClass = "flex-none gap-2 rounded-md px-3 sm:px-4"
 
 function SettingsTabs() {
     const router = useRouter()
@@ -32,11 +33,12 @@ function SettingsTabs() {
             onValueChange={(value) => router.replace(`/configuracoes?tab=${value}`, { scroll: false })}
             className="space-y-6"
         >
-            <div className="-mx-2 px-2 overflow-x-auto">
-                <TabsList className="bg-zinc-900/5 dark:bg-zinc-100/5 border-none p-1 h-12 min-w-max">
+            {/* Rolagem horizontal no mobile; abas nunca quebram linha */}
+            <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+                <TabsList className="h-11 min-w-max">
                     {TABS.map(t => (
                         <TabsTrigger key={t.value} value={t.value} className={triggerClass}>
-                            <t.icon className="mr-2 h-4 w-4" />
+                            <t.icon className="h-4 w-4" aria-hidden="true" />
                             {t.label}
                         </TabsTrigger>
                     ))}
@@ -64,11 +66,8 @@ function SettingsTabs() {
 
 export default function SettingsPage() {
     return (
-        <div className="space-y-8 max-w-[1600px] mx-auto pb-12">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
-                <p className="text-sm text-muted-foreground">Gerencie suas categorias, contas, cartões e modelos de IA</p>
-            </div>
+        <div className="space-y-6 sm:space-y-8">
+            <PageHeader title="Configurações" description="Categorias, contas, cartões, modelos de IA e perfil" />
             <Suspense fallback={null}>
                 <SettingsTabs />
             </Suspense>

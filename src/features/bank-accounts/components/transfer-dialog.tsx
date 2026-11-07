@@ -26,6 +26,7 @@ import { BankAccount, settingsService } from "@/features/settings/services/setti
 import { useTransactionContextOptional } from "@/features/transactions/context/transaction-context"
 import { createTransfer } from "../services/transfers"
 import { todayISO } from "../services/balances"
+import { DatePicker } from "@/components/ds"
 
 interface TransferDialogProps {
     /** Conta pré-selecionada como origem */
@@ -84,13 +85,13 @@ export function TransferDialog({ defaultOrigemId, trigger }: TransferDialogProps
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 {trigger || (
-                    <Button variant="outline" size="sm" className="gap-2">
+                    <Button variant="outline">
                         <ArrowLeftRight className="h-4 w-4" />
                         Transferir
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Transferência entre contas</DialogTitle>
                     <DialogDescription>
@@ -127,7 +128,7 @@ export function TransferDialog({ defaultOrigemId, trigger }: TransferDialogProps
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="transf-data">Data</Label>
-                            <Input id="transf-data" type="date" value={data} onChange={e => setData(e.target.value)} required />
+                            <DatePicker id="transf-data" value={data} onChange={setData} />
                         </div>
                     </div>
                     <div className="space-y-2">

@@ -1,11 +1,10 @@
 "use client"
 
 import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
-import { ExternalLink, Repeat, ShieldCheck, Zap, CreditCard, Landmark, Loader2, RefreshCw } from "lucide-react"
+import { CreditCard, ExternalLink, Landmark, Loader2, RefreshCw, Repeat, ShieldCheck, Zap } from "lucide-react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
     Table,
     TableBody,
@@ -14,34 +13,38 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import { EmptyState, IconTile, PageHeader, SectionCard, StatCard, StatGrid, ToneBadge, type Tone } from "@/components/ds"
 import { useSubscriptions, useSubscriptionStats, useSubscriptionActions } from "@/features/subscriptions/hooks/use-subscriptions"
 import { SubscriptionFormModal } from "@/features/subscriptions/components/subscription-form-modal"
 import { DeleteSubscriptionDialog } from "@/features/subscriptions/components/delete-subscription-dialog"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Subscription } from "@/features/subscriptions/services/subscriptions"
 import { formatCurrency, parseLocalDate } from "@/lib/utils"
 
-// Mapeamento de cores para ícones
-const iconColors: Record<string, string> = {
-    vermelho: 'bg-red-500/10 text-red-600',
-    azul: 'bg-blue-500/10 text-blue-600',
-    verde: 'bg-emerald-500/10 text-emerald-600',
-    amarelo: 'bg-amber-500/10 text-amber-600',
-    roxo: 'bg-purple-500/10 text-purple-600',
-    rosa: 'bg-pink-500/10 text-pink-600',
-    laranja: 'bg-orange-500/10 text-orange-600',
-    default: 'bg-indigo-500/10 text-indigo-600',
+/** Cor nomeada da assinatura → tom do design system */
+const COLOR_TONE: Record<string, Tone> = {
+    vermelho: "danger",
+    azul: "info",
+    verde: "success",
+    amarelo: "warning",
+    roxo: "secondary",
+    rosa: "danger",
+    laranja: "tertiary",
 }
 
-// Mapeamento de status
-const statusConfig: Record<string, { label: string; className: string }> = {
-    ativo: { label: 'Ativo', className: 'bg-emerald-500/20 text-emerald-600' },
-    pausado: { label: 'Pausado', className: 'bg-amber-500/20 text-amber-600' },
-    cancelado: { label: 'Cancelado', className: 'bg-rose-500/20 text-rose-600' },
+const STATUS: Record<string, { label: string; tone: Tone }> = {
+    ativo: { label: "Ativo", tone: "success" },
+    pausado: { label: "Pausado", tone: "warning" },
+    cancelado: { label: "Cancelado", tone: "danger" },
 }
 
-// Mapeamento de frequência
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+
+const FREQUENCIA: Record<string, string> = {
+    mensal: "Mensal",
+    anual: "Anual",
+    trimestral: "Trimestral",
+    semanal: "Semanal",
+}
 
 /** Quando a assinatura cobra, conforme a frequência e a data de início. */
 function vencimentoLabel(sub: Subscription): string {
@@ -55,17 +58,7 @@ function vencimentoLabel(sub: Subscription): string {
     }
 }
 
-const frequenciaLabels: Record<string, string> = {
-    mensal: 'Mensal',
-    anual: 'Anual',
-    trimestral: 'Trimestral',
-    semanal: 'Semanal',
-}
-
-function getIconColor(cor: string | null | undefined): string {
-    if (!cor) return iconColors.default
-    return iconColors[cor.toLowerCase()] || iconColors.default
-}
+const toneOf = (cor: string | null | undefined): Tone => COLOR_TONE[cor?.toLowerCase() ?? ""] ?? "secondary"
 
 export default function AssinaturasPage() {
     const { subscriptions, loading, refresh } = useSubscriptions()
@@ -79,178 +72,172 @@ export default function AssinaturasPage() {
     }
 
     const handleGenerateExpenses = async () => {
-        const currentMonth = new Date().getMonth() + 1
-        const currentYear = new Date().getFullYear()
-        await generateExpenses(currentMonth, currentYear)
+        const now = new Date()
+        await generateExpenses(now.getMonth() + 1, now.getFullYear())
     }
 
+    const seguranca = stats.totalPausadas === 0 && stats.totalCanceladas === 0 ? "Alta" : stats.totalPausadas > 0 ? "Média" : "Baixa"
+
+    const rowActions = (sub: Subscription) => (
+        <div className="flex justify-end gap-1">
+            {sub.url && (
+                <Button asChild variant="ghost" size="icon-sm" className="text-muted-foreground">
+                    <a href={sub.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir site de ${sub.nome}`}>
+                        <ExternalLink />
+                    </a>
+                </Button>
+            )}
+            <SubscriptionFormModal subscription={sub} onSuccess={handleRefresh} />
+            <DeleteSubscriptionDialog subscription={sub} onSuccess={handleRefresh} />
+        </div>
+    )
+
+    const pagamento = (sub: Subscription) =>
+        sub.cartao ? (
+            <span className="inline-flex items-center gap-1.5"><CreditCard className="h-3 w-3" aria-hidden="true" />{sub.cartao.nome}</span>
+        ) : (
+            <span className="inline-flex items-center gap-1.5"><Landmark className="h-3 w-3" aria-hidden="true" />{sub.conta?.nome ?? "Conta padrão"}</span>
+        )
+
     return (
-        <div className="space-y-8 max-w-[1600px] mx-auto pb-12">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Assinaturas e Recorrência</h1>
-                    <p className="text-sm text-muted-foreground">Gerencie seus serviços, ferramentas e custos fixos mensais</p>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="bg-zinc-900/5 dark:bg-zinc-100/5 border-none"
-                        onClick={handleGenerateExpenses}
-                        disabled={actionLoading}
-                    >
-                        {actionLoading ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                        )}
-                        Gerar Despesas do Mês
-                    </Button>
-                    <SubscriptionFormModal onSuccess={handleRefresh} />
-                </div>
-            </div>
-
-            {/* Cards de Estatísticas */}
-            <div className="grid gap-4 md:grid-cols-3">
-                <Card className="border-none bg-zinc-900/5 dark:bg-zinc-100/10 shadow-none overflow-hidden group hover:shadow-md transition-all">
-                    <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Custo Mensal Fixo</p>
-                                {statsLoading ? (
-                                    <Skeleton className="h-9 w-32" />
-                                ) : (
-                                    <h3 className="text-3xl font-bold text-indigo-500 tracking-tight">
-                                        {formatCurrency(stats.custoMensal)}
-                                    </h3>
-                                )}
-                                <p className="text-[10px] text-muted-foreground font-medium">
-                                    {stats.totalAtivas} {stats.totalAtivas === 1 ? 'serviço ativo' : 'serviços ativos'}
-                                </p>
-                            </div>
-                            <div className="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
-                                <Repeat className="h-5 w-5 text-indigo-500" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none bg-zinc-900/5 dark:bg-zinc-100/10 shadow-none overflow-hidden group hover:shadow-md transition-all">
-                    <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Segurança Financeira</p>
-                                {statsLoading ? (
-                                    <Skeleton className="h-9 w-24" />
-                                ) : (
-                                    <h3 className="text-3xl font-bold text-emerald-500 tracking-tight">
-                                        {stats.totalPausadas === 0 && stats.totalCanceladas === 0 ? 'Alta' :
-                                            stats.totalPausadas > 0 ? 'Média' : 'Baixa'}
-                                    </h3>
-                                )}
-                                <p className="text-[10px] text-muted-foreground">
-                                    {stats.totalPausadas > 0
-                                        ? `${stats.totalPausadas} ${stats.totalPausadas === 1 ? 'assinatura pausada' : 'assinaturas pausadas'}`
-                                        : 'Nenhuma assinatura em atraso'}
-                                </p>
-                            </div>
-                            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                                <ShieldCheck className="h-5 w-5 text-emerald-500" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none bg-zinc-900/5 dark:bg-zinc-100/10 shadow-none overflow-hidden group hover:shadow-md transition-all">
-                    <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Custo Anual Estimado</p>
-                                {statsLoading ? (
-                                    <Skeleton className="h-9 w-32" />
-                                ) : (
-                                    <h3 className="text-3xl font-bold text-amber-500 tracking-tight">
-                                        {formatCurrency(stats.custoMensal * 12)}
-                                    </h3>
-                                )}
-                                <p className="text-[10px] text-muted-foreground">Projeção baseada nos custos mensais</p>
-                            </div>
-                            <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                                <Zap className="h-5 w-5 text-amber-500" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Tabela de Assinaturas */}
-            <Card className="border-none bg-zinc-900/5 dark:bg-zinc-100/5 shadow-none overflow-hidden">
-                <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-neux-1/5 px-6 py-4">
-                    <CardTitle className="text-sm font-semibold text-muted-foreground">Catálogo de Serviços Recorrentes</CardTitle>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs"
-                            onClick={handleRefresh}
-                            disabled={loading}
-                        >
-                            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                            Atualizar
+        <div className="space-y-6 sm:space-y-8">
+            <PageHeader
+                title="Assinaturas"
+                description="Serviços, ferramentas e custos fixos recorrentes"
+                actions={
+                    <>
+                        <Button variant="outline" onClick={handleGenerateExpenses} disabled={actionLoading}>
+                            {actionLoading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                            Gerar despesas do mês
                         </Button>
+                        <SubscriptionFormModal onSuccess={handleRefresh} />
+                    </>
+                }
+            />
+
+            <StatGrid columns={3}>
+                <StatCard
+                    label="Custo mensal fixo"
+                    amount={stats.custoMensal}
+                    hint={`${stats.totalAtivas} ${stats.totalAtivas === 1 ? "serviço ativo" : "serviços ativos"}`}
+                    icon={Repeat}
+                    tone="secondary"
+                    loading={statsLoading}
+                />
+                <StatCard
+                    label="Segurança financeira"
+                    value={seguranca}
+                    hint={stats.totalPausadas > 0
+                        ? `${stats.totalPausadas} ${stats.totalPausadas === 1 ? "assinatura pausada" : "assinaturas pausadas"}`
+                        : "Nenhuma assinatura pausada"}
+                    icon={ShieldCheck}
+                    tone={seguranca === "Alta" ? "success" : seguranca === "Média" ? "warning" : "danger"}
+                    loading={statsLoading}
+                />
+                <StatCard
+                    label="Custo anual estimado"
+                    amount={stats.custoMensal * 12}
+                    hint="Projeção baseada nos custos mensais"
+                    icon={Zap}
+                    tone="warning"
+                    loading={statsLoading}
+                />
+            </StatGrid>
+
+            <SectionCard
+                flush
+                className="pb-0"
+                title="Serviços recorrentes"
+                actions={
+                    <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={loading}>
+                        {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                        Atualizar
+                    </Button>
+                }
+            >
+                {loading ? (
+                    <div className="space-y-3 px-4 pb-5 sm:px-6">
+                        {[1, 2, 3].map(i => <Skeleton key={i} className="h-12" />)}
                     </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {loading ? (
-                        <div className="p-8 space-y-4">
-                            {[1, 2, 3].map((i) => (
-                                <div key={i} className="flex items-center gap-4">
-                                    <Skeleton className="h-9 w-9 rounded-lg" />
-                                    <div className="space-y-2 flex-1">
-                                        <Skeleton className="h-4 w-32" />
-                                        <Skeleton className="h-3 w-24" />
-                                    </div>
-                                    <Skeleton className="h-5 w-16" />
-                                    <Skeleton className="h-5 w-20" />
-                                    <Skeleton className="h-5 w-24" />
-                                </div>
-                            ))}
+                ) : subscriptions.length === 0 ? (
+                    <EmptyState
+                        icon={Repeat}
+                        tone="secondary"
+                        title="Nenhuma assinatura cadastrada"
+                        description="Adicione seus serviços de assinatura para ter controle dos custos fixos."
+                        action={<SubscriptionFormModal onSuccess={handleRefresh} />}
+                    />
+                ) : (
+                    <>
+                        {/* Mobile */}
+                        <ul className="stagger divide-y border-t md:hidden">
+                            {paged.pageItems.map(sub => {
+                                const status = STATUS[sub.status] ?? STATUS.ativo
+                                return (
+                                    <li key={sub.id} className="space-y-2 px-4 py-3">
+                                        <div className="flex items-center gap-3">
+                                            <IconTile icon={Repeat} tone={toneOf(sub.cor)} size="sm" />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate font-medium">{sub.nome}</p>
+                                                <p className="truncate text-xs text-muted-foreground">{vencimentoLabel(sub)}</p>
+                                            </div>
+                                            <span className="font-semibold tabular-nums">{formatCurrency(sub.valor)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                                <ToneBadge tone={status.tone}>{status.label}</ToneBadge>
+                                                <ToneBadge>{FREQUENCIA[sub.frequencia] ?? sub.frequencia}</ToneBadge>
+                                                {pagamento(sub)}
+                                            </div>
+                                            <div className="-mr-2 shrink-0">{rowActions(sub)}</div>
+                                        </div>
+                                    </li>
+                                )
+                            })}
+                        </ul>
+
+                        {/* Desktop */}
+                        <div className="hidden md:block">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="px-6">Serviço</TableHead>
+                                        <TableHead>Frequência</TableHead>
+                                        <TableHead className="hidden lg:table-cell">Cobrança</TableHead>
+                                        <TableHead className="hidden lg:table-cell">Pagamento</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Valor</TableHead>
+                                        <TableHead className="px-6 text-right">Ações</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {paged.pageItems.map(sub => {
+                                        const status = STATUS[sub.status] ?? STATUS.ativo
+                                        return (
+                                            <TableRow key={sub.id}>
+                                                <TableCell className="px-6 py-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <IconTile icon={Repeat} tone={toneOf(sub.cor)} size="sm" />
+                                                        <div className="min-w-0">
+                                                            <p className="truncate font-medium">{sub.nome}</p>
+                                                            <p className="truncate text-xs text-muted-foreground">
+                                                                {sub.descricao || sub.categoria?.nome || "Sem categoria"}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell><ToneBadge>{FREQUENCIA[sub.frequencia] ?? sub.frequencia}</ToneBadge></TableCell>
+                                                <TableCell className="hidden text-muted-foreground lg:table-cell">{vencimentoLabel(sub)}</TableCell>
+                                                <TableCell className="hidden text-muted-foreground lg:table-cell">{pagamento(sub)}</TableCell>
+                                                <TableCell><ToneBadge tone={status.tone}>{status.label}</ToneBadge></TableCell>
+                                                <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(sub.valor)}</TableCell>
+                                                <TableCell className="px-6">{rowActions(sub)}</TableCell>
+                                            </TableRow>
+                                        )
+                                    })}
+                                </TableBody>
+                            </Table>
                         </div>
-                    ) : subscriptions.length === 0 ? (
-                        <div className="p-12 text-center">
-                            <div className="h-16 w-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
-                                <Repeat className="h-8 w-8 text-indigo-500" />
-                            </div>
-                            <h3 className="text-lg font-semibold mb-2">Nenhuma assinatura cadastrada</h3>
-                            <p className="text-sm text-muted-foreground mb-6">
-                                Comece adicionando seus serviços de assinatura para ter controle dos custos fixos.
-                            </p>
-                            <SubscriptionFormModal onSuccess={handleRefresh} />
-                        </div>
-                    ) : (
-                        <>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="font-medium text-xs h-10 px-6">Serviço / Ferramenta</TableHead>
-                                    <TableHead className="font-medium text-xs h-10 hidden sm:table-cell">Frequência</TableHead>
-                                    <TableHead className="font-medium text-xs h-10 hidden md:table-cell">Próximo Pagto</TableHead>
-                                    <TableHead className="font-medium text-xs h-10 hidden md:table-cell">Cartão</TableHead>
-                                    <TableHead className="font-medium text-xs h-10">Status</TableHead>
-                                    <TableHead className="font-medium text-xs h-10 text-right px-6">Valor</TableHead>
-                                    <TableHead className="font-medium text-xs h-10 text-right px-6">Ações</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {paged.pageItems.map((subscription) => (
-                                    <SubscriptionRow
-                                        key={subscription.id}
-                                        subscription={subscription}
-                                        onRefresh={handleRefresh}
-                                    />
-                                ))}
-                            </TableBody>
-                        </Table>
                         <DataTablePagination
                             page={paged.page}
                             pageSize={paged.pageSize}
@@ -258,93 +245,9 @@ export default function AssinaturasPage() {
                             onPageChange={paged.setPage}
                             onPageSizeChange={paged.setPageSize}
                         />
-                        </>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-    )
-}
-
-function SubscriptionRow({ subscription, onRefresh }: { subscription: Subscription; onRefresh: () => void }) {
-    const statusInfo = statusConfig[subscription.status] || statusConfig.ativo
-    const frequenciaLabel = frequenciaLabels[subscription.frequencia] || subscription.frequencia
-
-    // Calcular próximo pagamento
-    const hoje = new Date()
-    const diaVencimento = subscription.data_vencimento_dia || 1
-    let proximoPagamento = new Date(hoje.getFullYear(), hoje.getMonth(), diaVencimento)
-
-    if (proximoPagamento <= hoje) {
-        proximoPagamento = new Date(hoje.getFullYear(), hoje.getMonth() + 1, diaVencimento)
-    }
-
-    return (
-        <TableRow className="border-neux-1/5 hover:bg-zinc-900/5 dark:hover:bg-zinc-100/5 transition-colors">
-            <TableCell className="px-6 py-4">
-                <div className="flex items-center gap-3">
-                    <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${getIconColor(subscription.cor)}`}>
-                        <Repeat className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <p className="font-bold text-sm">{subscription.nome}</p>
-                        <p className="text-[10px] text-muted-foreground tracking-tight">
-                            {subscription.descricao || subscription.categoria?.nome || 'Sem categoria'}
-                        </p>
-                    </div>
-                </div>
-            </TableCell>
-            <TableCell className="hidden sm:table-cell">
-                <Badge variant="outline" className="border-none bg-zinc-200 dark:bg-zinc-800 text-[10px]">
-                    {frequenciaLabel}
-                </Badge>
-            </TableCell>
-            <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
-                {vencimentoLabel(subscription)}
-            </TableCell>
-            <TableCell className="hidden md:table-cell">
-                {subscription.cartao ? (
-                    <div className="flex items-center gap-2">
-                        <CreditCard className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-xs">{subscription.cartao.nome}</span>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                        <Landmark className="h-3 w-3" />
-                        <span className="text-xs">{subscription.conta?.nome ?? "Conta padrão"}</span>
-                    </div>
+                    </>
                 )}
-            </TableCell>
-            <TableCell>
-                <Badge className={`${statusInfo.className} border-none text-[10px] h-5`}>
-                    {statusInfo.label}
-                </Badge>
-            </TableCell>
-            <TableCell className="text-right font-bold text-zinc-900 dark:text-zinc-100 px-6">
-                {formatCurrency(subscription.valor)}
-            </TableCell>
-            <TableCell className="text-right px-6">
-                <div className="flex justify-end gap-1">
-                    {subscription.url && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground"
-                            onClick={() => window.open(subscription.url!, '_blank')}
-                        >
-                            <ExternalLink className="h-4 w-4" />
-                        </Button>
-                    )}
-                    <SubscriptionFormModal
-                        subscription={subscription}
-                        onSuccess={onRefresh}
-                    />
-                    <DeleteSubscriptionDialog
-                        subscription={subscription}
-                        onSuccess={onRefresh}
-                    />
-                </div>
-            </TableCell>
-        </TableRow>
+            </SectionCard>
+        </div>
     )
 }

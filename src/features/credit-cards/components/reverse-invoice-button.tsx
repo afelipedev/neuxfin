@@ -44,7 +44,7 @@ export function ReverseInvoiceButton({ pagamentoId, onSuccess }: { pagamentoId: 
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" disabled={loading} className="gap-2">
+                <Button variant="outline" disabled={loading}>
                     <Undo2 className="h-4 w-4" /> Estornar pagamento
                 </Button>
             </AlertDialogTrigger>
@@ -58,7 +58,7 @@ export function ReverseInvoiceButton({ pagamentoId, onSuccess }: { pagamentoId: 
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleReverse} className="bg-rose-600 hover:bg-rose-700 text-white">
+                    <AlertDialogAction onClick={handleReverse} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                         Estornar
                     </AlertDialogAction>
                 </AlertDialogFooter>

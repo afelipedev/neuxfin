@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Trash2, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { IconTile } from "@/components/ds"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -59,22 +60,20 @@ export function DeleteTransactionDialog({ transaction, onSuccess, trigger }: Del
         <AlertDialog open={open} onOpenChange={setOpen}>
             <AlertDialogTrigger asChild>
                 {trigger || (
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500">
-                        <Trash2 className="h-3.5 w-3.5" />
+                    <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive" aria-label="Excluir transação">
+                        <Trash2 />
                     </Button>
                 )}
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-rose-500/10 flex items-center justify-center">
-                            <AlertTriangle className="h-5 w-5 text-rose-500" />
-                        </div>
-                        <AlertDialogTitle>Excluir Transação</AlertDialogTitle>
+                        <IconTile icon={AlertTriangle} tone="danger" />
+                        <AlertDialogTitle>Excluir transação</AlertDialogTitle>
                     </div>
                     <AlertDialogDescription className="pt-2">
                         Você está prestes a excluir a transação:
-                        <div className="mt-2 p-3 bg-zinc-900/5 dark:bg-zinc-100/5 rounded-lg">
+                        <div className="mt-2 p-3 bg-muted rounded-lg">
                             <p className="font-medium">{transaction.descricao}</p>
                             <p className="text-sm text-muted-foreground">
                                 {formatCurrency(transaction.valor)}
@@ -124,7 +123,7 @@ export function DeleteTransactionDialog({ transaction, onSuccess, trigger }: Del
                     <AlertDialogAction
                         onClick={handleDelete}
                         disabled={loading}
-                        className="bg-rose-500 hover:bg-rose-600"
+                        className="bg-destructive hover:bg-destructive"
                     >
                         {loading ? 'Excluindo...' : 'Excluir'}
                     </AlertDialogAction>

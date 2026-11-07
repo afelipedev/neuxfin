@@ -14,7 +14,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
     Select,
@@ -29,6 +28,7 @@ import { type BankAccount, settingsService } from "@/features/settings/services/
 import { useTransactionContextOptional } from "@/features/transactions/context/transaction-context"
 import { todayISO } from "@/features/bank-accounts/services/balances"
 import { type Invoice, payInvoice } from "../services/invoices"
+import { DatePicker } from "@/components/ds"
 
 const supabase = createClient()
 
@@ -88,11 +88,11 @@ export function PayInvoiceDialog({ cardName, invoice, onSuccess }: PayInvoiceDia
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button size="sm" disabled={openIds.length === 0} className="bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold">
+                <Button disabled={openIds.length === 0}>
                     Pagar fatura
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Pagar fatura {cardName}</DialogTitle>
                     <DialogDescription>
@@ -103,7 +103,7 @@ export function PayInvoiceDialog({ cardName, invoice, onSuccess }: PayInvoiceDia
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="rounded-xl bg-secondary/50 p-4 flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Valor a pagar</span>
-                        <span className="text-xl font-black tabular-nums">{formatCurrency(invoice.em_aberto)}</span>
+                        <span className="text-xl font-bold tabular-nums">{formatCurrency(invoice.em_aberto)}</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -117,7 +117,7 @@ export function PayInvoiceDialog({ cardName, invoice, onSuccess }: PayInvoiceDia
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="fatura-data">Data do pagamento</Label>
-                            <Input id="fatura-data" type="date" value={data} onChange={e => setData(e.target.value)} required />
+                            <DatePicker id="fatura-data" value={data} onChange={setData} />
                         </div>
                     </div>
                     {accounts.length === 0 && (

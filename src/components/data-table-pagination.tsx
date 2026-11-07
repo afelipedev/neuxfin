@@ -55,7 +55,7 @@ export function DataTablePagination({
     if (totalCount === 0) return null
 
     const go = (target: number) => onPageChange(Math.min(Math.max(1, target), totalPages))
-    const navButton = "h-8 w-8 rounded-lg"
+    const navButton = "rounded-md"
 
     return (
         <nav
@@ -65,7 +65,7 @@ export function DataTablePagination({
                 className
             )}
         >
-            <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="tabular-nums">
                     Mostrando <span className="font-semibold text-foreground">{start}</span>–
                     <span className="font-semibold text-foreground">{end}</span> de{" "}
@@ -78,7 +78,7 @@ export function DataTablePagination({
                             value={String(pageSize)}
                             onValueChange={(v) => onPageSizeChange(Number(v))}
                         >
-                            <SelectTrigger className="h-8 w-[70px] text-xs" aria-label="Itens por página">
+                            <SelectTrigger size="sm" className="w-[72px]" aria-label="Itens por página">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -93,33 +93,33 @@ export function DataTablePagination({
 
             {totalPages > 1 && (
                 <div className="flex items-center gap-1">
-                    <Button variant="outline" size="icon" className={cn(navButton, "hidden sm:inline-flex")} onClick={() => go(1)} disabled={page === 1} aria-label="Primeira página">
+                    <Button variant="outline" size="icon-sm" className={cn(navButton, "hidden sm:inline-flex")} onClick={() => go(1)} disabled={page === 1} aria-label="Primeira página">
                         <ChevronsLeft className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="icon" className={navButton} onClick={() => go(page - 1)} disabled={page === 1} aria-label="Página anterior">
+                    <Button variant="outline" size="icon-sm" className={navButton} onClick={() => go(page - 1)} disabled={page === 1} aria-label="Página anterior">
                         <ChevronLeft className="h-4 w-4" />
                     </Button>
                     {pages.map(p => (
                         <Button
                             key={p}
                             variant={p === page ? "default" : "outline"}
-                            size="icon"
+                            size="icon-sm"
                             onClick={() => go(p)}
                             aria-label={`Página ${p}`}
                             aria-current={p === page ? "page" : undefined}
                             className={cn(
                                 navButton,
-                                "text-xs font-bold tabular-nums",
-                                p === page && "bg-brand-1 text-zinc-950 hover:bg-brand-2 border-brand-1"
+                                "text-xs font-semibold tabular-nums",
+                                p === page && "border-primary"
                             )}
                         >
                             {p}
                         </Button>
                     ))}
-                    <Button variant="outline" size="icon" className={navButton} onClick={() => go(page + 1)} disabled={page === totalPages} aria-label="Próxima página">
+                    <Button variant="outline" size="icon-sm" className={navButton} onClick={() => go(page + 1)} disabled={page === totalPages} aria-label="Próxima página">
                         <ChevronRight className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="icon" className={cn(navButton, "hidden sm:inline-flex")} onClick={() => go(totalPages)} disabled={page === totalPages} aria-label="Última página">
+                    <Button variant="outline" size="icon-sm" className={cn(navButton, "hidden sm:inline-flex")} onClick={() => go(totalPages)} disabled={page === totalPages} aria-label="Última página">
                         <ChevronsRight className="h-4 w-4" />
                     </Button>
                 </div>

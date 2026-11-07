@@ -35,6 +35,7 @@ import { useSubscriptionActions } from "../hooks/use-subscriptions"
 import { createClient } from "@/lib/supabase/client"
 import { Subscription } from "../services/subscriptions"
 import { todayISO } from "@/features/bank-accounts/services/balances"
+import { DatePicker } from "@/components/ds"
 
 /** Valor do Select para "nenhum": Radix Select não aceita string vazia como item */
 const NONE = "__none__"
@@ -235,11 +236,11 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
     ]
 
     const defaultTrigger = isEditing ? (
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-indigo-500">
+        <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label="Editar assinatura">
             <Edit className="h-4 w-4" />
         </Button>
     ) : (
-        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20 px-6">
+        <Button>
             <Plus className="mr-2 h-4 w-4" />
             Nova Assinatura
         </Button>
@@ -250,7 +251,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
             <DialogTrigger asChild>
                 {trigger || defaultTrigger}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[520px]">
                 <DialogHeader>
                     <DialogTitle>{isEditing ? 'Editar' : 'Nova'} Assinatura</DialogTitle>
                     <DialogDescription>
@@ -336,7 +337,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                                 <FormItem>
                                     <FormLabel>Início da cobrança</FormLabel>
                                     <FormControl>
-                                        <Input type="date" {...field} />
+                                        <DatePicker value={field.value} onChange={field.onChange} />
                                     </FormControl>
                                     <p className="text-xs text-muted-foreground">
                                         {frequencia === "anual"
@@ -517,7 +518,7 @@ export function SubscriptionFormModal({ subscription, onSuccess, trigger }: Subs
                             <Button
                                 type="submit"
                                 disabled={loading}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
+                                className="w-full sm:w-auto"
                             >
                                 {loading ? 'Salvando...' : (isEditing ? 'Atualizar' : 'Criar Assinatura')}
                             </Button>

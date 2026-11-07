@@ -144,7 +144,7 @@ export function ProfileSettings() {
 
     return (
         <div className="max-w-2xl space-y-6">
-            <Card className="border-none bg-zinc-900/5 dark:bg-zinc-100/5 shadow-none">
+            <Card className="gap-0 overflow-hidden py-0">
                 <CardHeader>
                     <CardTitle>Seu Perfil</CardTitle>
                     <CardDescription>Gerencie suas informações pessoais e preferências do sistema</CardDescription>
@@ -154,7 +154,7 @@ export function ProfileSettings() {
                         <div className="flex flex-col md:flex-row gap-8 items-start">
                             <div className="flex flex-col items-center gap-4">
                                 <div className="relative group">
-                                    <div className="h-32 w-32 rounded-3xl bg-gradient-to-tr from-brand-1 to-brand-3 flex items-center justify-center text-zinc-950 text-4xl font-black border-4 border-background shadow-xl overflow-hidden">
+                                    <div className="h-32 w-32 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground font-display text-4xl font-bold border-4 border-background shadow-md overflow-hidden">
                                         {profile.avatar_url ? (
                                             <img src={profile.avatar_url} alt={profile.nome} className="h-full w-full object-cover" />
                                         ) : (
@@ -162,7 +162,7 @@ export function ProfileSettings() {
                                         )}
                                     </div>
                                     {uploading && (
-                                        <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center">
+                                        <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center">
                                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
                                         </div>
                                     )}
@@ -178,7 +178,7 @@ export function ProfileSettings() {
                                     variant="outline"
                                     size="sm"
                                     type="button"
-                                    className="text-[10px] uppercase font-bold tracking-widest h-8"
+                                    
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={uploading}
                                 >
@@ -207,12 +207,12 @@ export function ProfileSettings() {
                                         <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                                         <Input
                                             id="email"
-                                            className="pl-10 bg-zinc-900/5 dark:bg-zinc-100/5 cursor-not-allowed"
+                                            className="pl-10 bg-muted cursor-not-allowed"
                                             value={profile.email}
                                             disabled
                                         />
                                     </div>
-                                    <p className="text-[10px] text-muted-foreground">O e-mail não pode ser alterado por aqui.</p>
+                                    <p className="text-xs text-muted-foreground">O e-mail não pode ser alterado por aqui.</p>
                                 </div>
 
                                 <div className="space-y-2">
@@ -230,13 +230,13 @@ export function ProfileSettings() {
                                             onChange={(e) => setProfile({ ...profile, configurar_cdi: parseFloat(e.target.value) })}
                                         />
                                     </div>
-                                    <p className="text-[10px] text-muted-foreground">Usada na previsão de rendimento dos cofrinhos (100% do CDI, ao ano).</p>
+                                    <p className="text-xs text-muted-foreground">Usada na previsão de rendimento dos cofrinhos (100% do CDI, ao ano).</p>
                                 </div>
                             </div>
                         </div>
 
                         <div className="flex justify-end pt-4 border-t border-border/50">
-                            <Button type="submit" disabled={saving} className="bg-brand-1 hover:bg-brand-2 text-zinc-950 font-bold min-w-[140px]">
+                            <Button type="submit" disabled={saving} className="min-w-[140px]">
                                 {saving ? "Salvando..." : <><Save className="mr-2 h-4 w-4" /> Salvar Alterações</>}
                             </Button>
                         </div>
