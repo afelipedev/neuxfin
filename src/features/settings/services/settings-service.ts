@@ -21,7 +21,7 @@ export type BankAccount = {
     saldo_inicial: number
     /** Data de referência do saldo inicial (YYYY-MM-DD). Movimentos anteriores são ignorados. */
     data_saldo_inicial: string | null
-    /** Conta usada por automações (IA/WhatsApp) quando nenhuma é informada. */
+    /** Conta usada pelo Amigão (chat/Telegram) quando nenhuma é informada. */
     padrao: boolean
     cor: string | null
     created_at: string

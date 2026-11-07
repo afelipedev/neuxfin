@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
-import { monthlyCost, subscriptionOccurrences } from './schedule'
+import { displaySubscriptionStatus, monthlyCost, subscriptionOccurrences } from './schedule'
+import { todayISO } from '@/features/bank-accounts/services/balances'
 
 export interface Subscription {
     id: string
@@ -13,6 +14,8 @@ export interface Subscription {
     conta_id: string | null
     /** Primeira cobrança possível; âncora de anual/trimestral/semanal */
     data_inicio: string
+    /** Última data possível de cobrança (vazia = sem fim) */
+    data_fim: string | null
     status: 'ativo' | 'pausado' | 'cancelado'
     descricao: string | null
     frequencia: 'mensal' | 'anual' | 'semanal' | 'trimestral'
@@ -90,9 +93,10 @@ export async function getSubscriptionById(id: string): Promise<Subscription | nu
 export async function getSubscriptionStats(): Promise<SubscriptionStats> {
     const { data, error } = await supabase
         .from('assinaturas')
-        .select('valor, status, frequencia')
+        .select('valor, status, frequencia, data_fim')
 
     if (error) throw error
+    const today = todayISO()
 
     const stats: SubscriptionStats = {
         custoMensal: 0,
@@ -101,15 +105,17 @@ export async function getSubscriptionStats(): Promise<SubscriptionStats> {
         totalCanceladas: 0
     };
 
-    ((data ?? []) as Array<Pick<Subscription, 'valor' | 'status' | 'frequencia'>>).forEach((sub) => {
+    ((data ?? []) as Array<Pick<Subscription, 'valor' | 'status' | 'frequencia' | 'data_fim'>>).forEach((sub) => {
         const valorMensal = monthlyCost(sub.valor, sub.frequencia)
+        const status = displaySubscriptionStatus(sub, today)
 
-        if (sub.status === 'ativo') {
+        if (status === 'ativo') {
             stats.custoMensal = Math.round((stats.custoMensal + valorMensal) * 100) / 100
             stats.totalAtivas++
-        } else if (sub.status === 'pausado') {
+        } else if (status === 'pausado') {
             stats.totalPausadas++
-        } else if (sub.status === 'cancelado') {
+        } else {
+            // Canceladas e encerradas (data_fim no passado)
             stats.totalCanceladas++
         }
     })
@@ -196,7 +202,7 @@ export async function generateExpensesFromSubscriptions(
     const [subsRes, contaRes] = await Promise.all([
         supabase
             .from('assinaturas')
-            .select('id, nome, valor, frequencia, data_vencimento_dia, data_inicio, categoria_id, cartao_id, conta_id')
+            .select('id, nome, valor, frequencia, data_vencimento_dia, data_inicio, data_fim, categoria_id, cartao_id, conta_id')
             .eq('status', 'ativo'),
         supabase
             .from('contas_bancarias')
@@ -208,7 +214,7 @@ export async function generateExpensesFromSubscriptions(
     if (contaRes.error) throw contaRes.error
     const contaPadrao = contaRes.data?.id ?? null
 
-    type SubRow = Pick<Subscription, 'id' | 'nome' | 'valor' | 'frequencia' | 'data_vencimento_dia' | 'data_inicio' | 'categoria_id' | 'cartao_id' | 'conta_id'>
+    type SubRow = Pick<Subscription, 'id' | 'nome' | 'valor' | 'frequencia' | 'data_vencimento_dia' | 'data_inicio' | 'data_fim' | 'categoria_id' | 'cartao_id' | 'conta_id'>
     const rows = ((subsRes.data ?? []) as SubRow[]).flatMap(sub =>
         subscriptionOccurrences(sub, year, month).map(data_vencimento => ({
             usuario_id: user.id,

@@ -11,6 +11,11 @@ describe('nextSubscriptionCharge', () => {
         expect(nextSubscriptionCharge(sub, '2026-11-11')).toBe('2026-12-10')
     })
 
+    it('sem próxima cobrança depois do encerramento', () => {
+        const sub = { frequencia: 'mensal' as const, data_vencimento_dia: 10, data_inicio: '2026-01-01', data_fim: '2026-11-30' }
+        expect(nextSubscriptionCharge(sub, '2026-11-11')).toBeNull()
+    })
+
     it('anual: só no mês de aniversário', () => {
         const sub = { frequencia: 'anual' as const, data_vencimento_dia: 15, data_inicio: '2026-03-01' }
         expect(nextSubscriptionCharge(sub, '2026-11-07')).toBe('2027-03-15')

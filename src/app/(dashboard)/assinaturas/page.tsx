@@ -18,6 +18,8 @@ import { useSubscriptions, useSubscriptionStats, useSubscriptionActions } from "
 import { SubscriptionFormModal } from "@/features/subscriptions/components/subscription-form-modal"
 import { DeleteSubscriptionDialog } from "@/features/subscriptions/components/delete-subscription-dialog"
 import { Subscription } from "@/features/subscriptions/services/subscriptions"
+import { displaySubscriptionStatus } from "@/features/subscriptions/services/schedule"
+import { todayISO } from "@/features/bank-accounts/services/balances"
 import { formatCurrency, parseLocalDate } from "@/lib/utils"
 
 /** Cor nomeada da assinatura → tom do design system */
@@ -35,6 +37,7 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
     ativo: { label: "Ativo", tone: "success" },
     pausado: { label: "Pausado", tone: "warning" },
     cancelado: { label: "Cancelado", tone: "danger" },
+    encerrado: { label: "Encerrada", tone: "neutral" },
 }
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
@@ -50,12 +53,18 @@ const FREQUENCIA: Record<string, string> = {
 function vencimentoLabel(sub: Subscription): string {
     const inicio = parseLocalDate(sub.data_inicio)
     const dia = sub.data_vencimento_dia ?? inicio.getDate()
+    let label: string
     switch (sub.frequencia) {
-        case "semanal": return `Toda semana desde ${format(inicio, "dd/MM")}`
-        case "anual": return `Todo ano em ${dia} de ${MESES[inicio.getMonth()]}`
-        case "trimestral": return `A cada 3 meses, dia ${dia}`
-        default: return `Todo dia ${dia}`
+        case "semanal": label = `Toda semana desde ${format(inicio, "dd/MM")}`; break
+        case "anual": label = `Todo ano em ${dia} de ${MESES[inicio.getMonth()]}`; break
+        case "trimestral": label = `A cada 3 meses, dia ${dia}`; break
+        default: label = `Todo dia ${dia}`
     }
+    if (sub.data_fim) {
+        const fim = format(parseLocalDate(sub.data_fim), "dd/MM/yyyy")
+        label += sub.data_fim.slice(0, 10) < todayISO() ? ` · encerrada em ${fim}` : ` · até ${fim}`
+    }
+    return label
 }
 
 const toneOf = (cor: string | null | undefined): Tone => COLOR_TONE[cor?.toLowerCase() ?? ""] ?? "secondary"
@@ -172,7 +181,7 @@ export default function AssinaturasPage() {
                         {/* Mobile */}
                         <ul className="stagger divide-y border-t md:hidden">
                             {paged.pageItems.map(sub => {
-                                const status = STATUS[sub.status] ?? STATUS.ativo
+                                const status = STATUS[displaySubscriptionStatus(sub, todayISO())] ?? STATUS.ativo
                                 return (
                                     <li key={sub.id} className="space-y-2 px-4 py-3">
                                         <div className="flex items-center gap-3">
@@ -212,7 +221,7 @@ export default function AssinaturasPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {paged.pageItems.map(sub => {
-                                        const status = STATUS[sub.status] ?? STATUS.ativo
+                                        const status = STATUS[displaySubscriptionStatus(sub, todayISO())] ?? STATUS.ativo
                                         return (
                                             <TableRow key={sub.id}>
                                                 <TableCell className="px-6 py-3">

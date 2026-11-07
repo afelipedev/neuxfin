@@ -9,18 +9,40 @@ export interface ScheduleInput {
     data_vencimento_dia: number | null
     /** Primeira cobrança possível (YYYY-MM-DD); define o mês de anual/trimestral e o dia da semana de semanal. */
     data_inicio: string
+    /** Última data em que pode haver cobrança (YYYY-MM-DD). Nulo/ausente = sem fim. */
+    data_fim?: string | null
+}
+
+export type SubscriptionDisplayStatus = 'ativo' | 'pausado' | 'cancelado' | 'encerrado'
+
+/** Status para exibição: uma assinatura ativa com data_fim no passado está "encerrada". */
+export function displaySubscriptionStatus(
+    sub: { status: 'ativo' | 'pausado' | 'cancelado'; data_fim?: string | null },
+    today: string
+): SubscriptionDisplayStatus {
+    return sub.status === 'ativo' && isSubscriptionEnded(sub, today) ? 'encerrado' : sub.status
+}
+
+/** A assinatura já terminou em `today` (data_fim no passado). */
+export function isSubscriptionEnded(sub: Pick<ScheduleInput, 'data_fim'>, today: string): boolean {
+    return !!sub.data_fim && sub.data_fim.slice(0, 10) < today
 }
 
 const monthsBetween = (a: Date, b: Date) => (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth())
 
 /**
- * Datas de cobrança da assinatura dentro do mês (`month` 1-12), nunca antes de data_inicio.
+ * Datas de cobrança da assinatura dentro do mês (`month` 1-12), entre data_inicio e data_fim.
  * - mensal: todo mês, no dia de vencimento (limitado ao último dia do mês)
  * - trimestral: a cada 3 meses a partir do mês de início
  * - anual: no mês de início, todo ano
  * - semanal: a cada 7 dias a partir de data_inicio
  */
 export function subscriptionOccurrences(sub: ScheduleInput, year: number, month: number): string[] {
+    const fim = sub.data_fim ? sub.data_fim.slice(0, 10) : null
+    return occurrencesFromStart(sub, year, month).filter(d => !fim || d <= fim)
+}
+
+function occurrencesFromStart(sub: ScheduleInput, year: number, month: number): string[] {
     const inicio = parseLocalDate(sub.data_inicio)
     const monthStart = new Date(year, month - 1, 1)
     const monthEnd = new Date(year, month, 0)

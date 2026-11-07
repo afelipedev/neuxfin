@@ -2,7 +2,8 @@
 
 import { DataTablePagination, usePaginatedList } from "@/components/data-table-pagination"
 import * as React from "react"
-import { Plus, Landmark, Trash2, Edit, Wallet, Banknote, Star } from "lucide-react"
+import { Plus, Landmark, Trash2, Edit, Wallet, Banknote, Star, Scale } from "lucide-react"
+import { AdjustBalanceDialog } from "@/features/bank-accounts/components/adjust-balance-dialog"
 import { Button } from "@/components/ui/button"
 import { ToneBadge } from "@/components/ds"
 import { Card, CardContent } from "@/components/ui/card"
@@ -117,7 +118,7 @@ export function AccountsSettings() {
         try {
             await settingsService.setDefaultBankAccount(account.padrao ? null : account.id)
             toast.success(account.padrao ? "Conta padrão removida" : `${account.nome} agora é a conta padrão`, {
-                description: account.padrao ? undefined : "Usada pela IA e pelo WhatsApp quando nenhuma conta é informada."
+                description: account.padrao ? undefined : "Usada pelo Amigão (chat e Telegram) quando nenhuma conta é informada."
             })
             fetchAccounts()
         } catch (error) {
@@ -353,10 +354,20 @@ export function AccountsSettings() {
                                                     onClick={() => handleToggleDefault(account)}
                                                     aria-label={account.padrao ? "Remover como conta padrão" : "Definir como conta padrão"}
                                                     aria-pressed={account.padrao}
-                                                    title={account.padrao ? "Conta padrão (usada pela IA e pelo WhatsApp)" : "Definir como conta padrão"}
+                                                    title={account.padrao ? "Conta padrão (usada pelo Amigão no chat e no Telegram)" : "Definir como conta padrão"}
                                                 >
                                                     <Star fill={account.padrao ? "currentColor" : "none"} />
                                                 </Button>
+                                                <AdjustBalanceDialog
+                                                    contaId={account.id}
+                                                    account={account}
+                                                    onSaved={fetchAccounts}
+                                                    trigger={
+                                                        <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={`Ajustar saldo de ${account.nome}`} title="Ajustar saldo">
+                                                            <Scale />
+                                                        </Button>
+                                                    }
+                                                />
                                                 <Button
                                                     variant="ghost"
                                                     size="icon-sm"

@@ -175,8 +175,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const likeLiteral = (s: string) => s.replace(/[%_\\]/g, ch => `\\${ch}`)
 
 /**
- * Cria uma transação a partir da IA (chat) ou da automação do WhatsApp.
- * Atenção: no WhatsApp o cliente é service-role (ignora RLS), então TODAS as consultas
+ * Cria uma transação a partir da IA (chat ou Telegram).
+ * Defesa em profundidade: mesmo com o client do usuário (RLS), TODAS as consultas
  * filtram explicitamente por usuario_id.
  * Conta: a citada pelo nome → a conta padrão → a única conta do usuário → sem conta.
  */
