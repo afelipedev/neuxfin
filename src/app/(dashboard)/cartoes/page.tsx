@@ -22,7 +22,7 @@ function InvoiceLine({ label, invoice }: { label: string; invoice: Invoice }) {
                 <p className="text-xs text-muted-foreground">Vence {format(parseLocalDate(invoice.vencimento), "dd/MM")}</p>
             </div>
             <div className="space-y-1 text-right">
-                <p className="font-semibold tabular-nums">{formatCurrency(invoice.status === "paga" ? invoice.total : invoice.em_aberto)}</p>
+                <p className="font-semibold tabular-nums">{formatCurrency(invoice.status === "paga" || invoice.status === "parcial" ? invoice.total : invoice.em_aberto)}</p>
                 <InvoiceStatusBadge status={invoice.status} />
             </div>
         </div>

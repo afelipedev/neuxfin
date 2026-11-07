@@ -7,6 +7,7 @@ const STATUS_TONE: Record<InvoiceStatus, Tone> = {
     fechada: "warning",
     vencida: "danger",
     paga: "success",
+    parcial: "warning",
 }
 
 export function InvoiceStatusBadge({ status, className }: { status: InvoiceStatus; className?: string }) {

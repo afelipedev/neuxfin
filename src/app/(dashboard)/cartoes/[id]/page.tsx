@@ -61,7 +61,7 @@ function CardInvoicePage() {
         const status: Invoice["status"] = today < fechamento
             ? (key <= invoiceKeyForDate(today, card) ? "aberta" : "futura")
             : "fechada"
-        return { cartao_id: card.id, key, fechamento, vencimento, total: 0, em_aberto: 0, compras: [], pagamento: null, status }
+        return { cartao_id: card.id, key, fechamento, vencimento, total: 0, saldo_anterior: 0, em_aberto: 0, compras: [], pagamento: null, status }
     }, [card, key])
 
     const compras = usePaginatedList(invoice?.compras ?? [], 10, key ?? "")
@@ -119,12 +119,20 @@ function CardInvoicePage() {
                                 {invoice.pagamento ? (
                                     <p className="text-sm text-muted-foreground">
                                         Paga em {formatDay(invoice.pagamento.data_pagamento)} com {invoice.pagamento.conta?.nome ?? "conta"} · {formatCurrency(Number(invoice.pagamento.valor))}
+                                        {Number(invoice.pagamento.saldo_restante) > 0 && (
+                                            <> · {formatCurrency(Number(invoice.pagamento.saldo_restante))} foram para a próxima fatura</>
+                                        )}
                                     </p>
                                 ) : (
                                     <p className="text-sm text-muted-foreground">
                                         {invoice.status === "aberta" || invoice.status === "futura"
                                             ? "Fatura ainda aberta: novas compras até o fechamento entram nela."
                                             : invoice.em_aberto > 0 ? "Fatura fechada aguardando pagamento." : "Sem valores a pagar."}
+                                    </p>
+                                )}
+                                {invoice.saldo_anterior > 0 && (
+                                    <p className="text-sm text-muted-foreground">
+                                        Inclui {formatCurrency(invoice.saldo_anterior)} de saldo da fatura anterior (pagamento parcial).
                                     </p>
                                 )}
                                 {pagoComRestante && (

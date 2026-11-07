@@ -15,7 +15,10 @@ import { fromCents, toCents, todayISO } from '@/features/bank-accounts/services/
  * - Dias inexistentes no mês (31 em fevereiro) são limitados ao último dia.
  * - Pagar a fatura (RPC pagar_fatura) debita UMA conta e liquida as compras. O pagamento não é
  *   despesa (a compra já foi contada no mês dela), só movimenta o saldo da conta.
- * - Limite usado = soma das compras em aberto (inclui parcelas futuras).
+ * - Pagamento parcial: o que não foi pago (saldo_restante) vira o "saldo da fatura anterior"
+ *   da competência seguinte. Ele soma no total/em aberto dela e no limite usado até ser pago,
+ *   mas não é compra nem despesa (a despesa já foi contada nas compras).
+ * - Limite usado = soma das compras em aberto (inclui parcelas futuras) + saldos carregados.
  */
 
 export interface CardInfo {
@@ -50,11 +53,14 @@ export interface InvoicePayment {
     valor: number | string
     data_pagamento: string
     estornado_em: string | null
+    /** Valor que ficou sem pagar e foi para a fatura seguinte (pagamento parcial) */
+    saldo_restante?: number | string | null
     conta?: { nome: string } | null
 }
 
 /** aberta = ciclo atual; futura = parcelas de ciclos seguintes; fechada = aguardando vencimento. */
-export type InvoiceStatus = 'aberta' | 'futura' | 'fechada' | 'vencida' | 'paga'
+/** parcial = paga com saldo restante levado para a próxima fatura. */
+export type InvoiceStatus = 'aberta' | 'futura' | 'fechada' | 'vencida' | 'paga' | 'parcial'
 
 export interface Invoice {
     cartao_id: string
@@ -63,6 +69,8 @@ export interface Invoice {
     fechamento: string
     vencimento: string
     total: number
+    /** Saldo não pago da fatura anterior (pagamento parcial), incluído em total */
+    saldo_anterior: number
     em_aberto: number
     compras: CardPurchase[]
     pagamento: InvoicePayment | null
@@ -136,6 +144,9 @@ export function buildInvoices(
         const key = pay.competencia.slice(0, 7)
         activePayments.set(key, pay)
         if (!byKey.has(key)) byKey.set(key, [])
+        // O saldo restante aparece na fatura seguinte, mesmo que ela não tenha compras
+        const nextKey = shiftInvoiceKey(key, 1)
+        if (toCents(pay.saldo_restante) > 0 && !byKey.has(nextKey)) byKey.set(nextKey, [])
     }
 
     return [...byKey.entries()]
@@ -150,9 +161,14 @@ export function buildInvoices(
                 if (c.status !== 'liquidado') aberto += cents
             }
             const pagamento = activePayments.get(key) ?? null
+            const anterior = toCents(activePayments.get(shiftInvoiceKey(key, -1))?.saldo_restante)
+            total += anterior
+            // Com pagamento, o saldo anterior já foi quitado por ele
+            if (!pagamento) aberto += anterior
 
             let status: InvoiceStatus
-            if (aberto === 0 && (pagamento || total > 0)) status = 'paga'
+            if (aberto === 0 && pagamento && toCents(pagamento.saldo_restante) > 0) status = 'parcial'
+            else if (aberto === 0 && (pagamento || total > 0)) status = 'paga'
             else if (today < fechamento) status = key <= currentKey ? 'aberta' : 'futura'
             else if (today <= vencimento) status = 'fechada'
             else status = 'vencida'
@@ -165,6 +181,7 @@ export function buildInvoices(
                 fechamento,
                 vencimento,
                 total: fromCents(total),
+                saldo_anterior: fromCents(anterior),
                 em_aberto: fromCents(aberto),
                 compras,
                 pagamento,
@@ -173,12 +190,26 @@ export function buildInvoices(
         })
 }
 
-/** Limite usado (compras em aberto, inclusive parcelas futuras) e disponível. */
-export function cardLimitUsage(card: CardInfo, purchases: CardPurchase[]): { usado: number; disponivel: number } {
-    const usado = purchases.reduce(
+/**
+ * Limite usado (compras em aberto, inclusive parcelas futuras, + saldo de pagamento parcial
+ * ainda não quitado pela fatura seguinte) e disponível.
+ */
+export function cardLimitUsage(
+    card: CardInfo,
+    purchases: CardPurchase[],
+    payments: InvoicePayment[] = []
+): { usado: number; disponivel: number } {
+    const compras = purchases.reduce(
         (acc, p) => (p.cartao_id === card.id && p.status !== 'liquidado' ? acc + toCents(p.valor) : acc),
         0
     )
+    const ativos = payments.filter(p => p.cartao_id === card.id && !p.estornado_em)
+    const pagas = new Set(ativos.map(p => p.competencia.slice(0, 7)))
+    const carregado = ativos.reduce(
+        (acc, p) => (pagas.has(shiftInvoiceKey(p.competencia.slice(0, 7), 1)) ? acc : acc + toCents(p.saldo_restante)),
+        0
+    )
+    const usado = compras + carregado
     return { usado: fromCents(usado), disponivel: fromCents(toCents(card.limite) - usado) }
 }
 
@@ -197,7 +228,8 @@ export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
     futura: 'Futura',
     fechada: 'Fechada',
     vencida: 'Vencida',
-    paga: 'Paga'
+    paga: 'Paga',
+    parcial: 'Paga parcialmente'
 }
 
 // ---------- Acesso a dados ----------
@@ -247,7 +279,7 @@ export async function fetchCardsOverview(supabase: SupabaseClient, today: string
         fetchAll<InvoicePayment>((from, to) =>
             supabase
                 .from('faturas_pagamentos')
-                .select('id, cartao_id, competencia, conta_id, valor, data_pagamento, estornado_em, conta:contas_bancarias(nome)')
+                .select('id, cartao_id, competencia, conta_id, valor, saldo_restante, data_pagamento, estornado_em, conta:contas_bancarias(nome)')
                 .is('estornado_em', null)
                 .order('id')
                 .range(from, to)
@@ -262,7 +294,7 @@ export async function fetchCardsOverview(supabase: SupabaseClient, today: string
         const currentKey = invoiceKeyForDate(today, card)
         return {
             ...card,
-            ...cardLimitUsage(card, purchases),
+            ...cardLimitUsage(card, purchases, payments),
             invoices,
             fatura_atual: invoices.find(i => i.key === currentKey) ?? null,
             fatura_pendente: invoices.find(i => i.status === 'fechada' || i.status === 'vencida') ?? null
@@ -274,14 +306,23 @@ export async function fetchCardsOverview(supabase: SupabaseClient, today: string
 
 export async function payInvoice(
     supabase: SupabaseClient,
-    params: { cartaoId: string; invoiceKey: string; contaId: string; dataPagamento: string; transacaoIds: string[] }
+    params: {
+        cartaoId: string
+        invoiceKey: string
+        contaId: string
+        dataPagamento: string
+        transacaoIds: string[]
+        /** Valor pago; ausente = fatura inteira. Menor que o devido = pagamento parcial */
+        valor?: number | null
+    }
 ) {
     const { data, error } = await supabase.rpc('pagar_fatura', {
         p_cartao_id: params.cartaoId,
         p_competencia: keyToCompetencia(params.invoiceKey),
         p_conta_id: params.contaId,
         p_data_pagamento: params.dataPagamento,
-        p_transacao_ids: params.transacaoIds
+        p_transacao_ids: params.transacaoIds,
+        p_valor: params.valor ?? null
     })
     if (error) throw error
     return data as InvoicePayment

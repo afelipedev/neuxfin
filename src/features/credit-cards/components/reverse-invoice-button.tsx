@@ -16,6 +16,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { createClient } from "@/lib/supabase/client"
+import { getErrorMessage } from "@/lib/utils"
 import { useTransactionContextOptional } from "@/features/transactions/context/transaction-context"
 import { reverseInvoicePayment } from "../services/invoices"
 
@@ -35,7 +36,7 @@ export function ReverseInvoiceButton({ pagamentoId, onSuccess }: { pagamentoId: 
             onSuccess?.()
         } catch (err) {
             console.error(err)
-            toast.error(err instanceof Error ? err.message : "Erro ao estornar pagamento")
+            toast.error(getErrorMessage(err, "Erro ao estornar pagamento"))
         } finally {
             setLoading(false)
         }
