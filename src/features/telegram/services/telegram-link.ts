@@ -6,7 +6,12 @@ export interface TelegramLinkStatus {
     vinculado: boolean
     username: string | null
     vinculado_em: string | null
+    lembretes_ativos: boolean
+    lembrete_hora: number
+    resumo_semanal: boolean
 }
+
+export const DEFAULT_REMINDERS = { lembretes_ativos: true, lembrete_hora: 8, resumo_semanal: true }
 
 export interface TelegramLinkCode {
     codigo: string
@@ -23,13 +28,16 @@ export const telegramDeepLink = (codigo: string) =>
 export async function getTelegramStatus(): Promise<TelegramLinkStatus> {
     const { data, error } = await supabase
         .from('telegram_vinculos')
-        .select('telegram_username, vinculado_em')
+        .select('telegram_username, vinculado_em, lembretes_ativos, lembrete_hora, resumo_semanal')
         .maybeSingle()
     if (error) throw error
     return {
         vinculado: !!data?.vinculado_em,
         username: data?.telegram_username ?? null,
         vinculado_em: data?.vinculado_em ?? null,
+        lembretes_ativos: data?.lembretes_ativos ?? DEFAULT_REMINDERS.lembretes_ativos,
+        lembrete_hora: data?.lembrete_hora ?? DEFAULT_REMINDERS.lembrete_hora,
+        resumo_semanal: data?.resumo_semanal ?? DEFAULT_REMINDERS.resumo_semanal,
     }
 }
 
@@ -44,5 +52,14 @@ export async function generateTelegramCode(): Promise<TelegramLinkCode> {
 
 export async function unlinkTelegram() {
     const { error } = await supabase.rpc('desvincular_telegram')
+    if (error) throw error
+}
+
+export async function saveReminderPreferences(p: { lembretes_ativos: boolean; lembrete_hora: number; resumo_semanal: boolean }) {
+    const { error } = await supabase.rpc('salvar_preferencias_telegram', {
+        p_ativos: p.lembretes_ativos,
+        p_hora: p.lembrete_hora,
+        p_resumo: p.resumo_semanal,
+    })
     if (error) throw error
 }

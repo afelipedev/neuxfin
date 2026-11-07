@@ -19,7 +19,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import { IconTile, SectionCard, ToneBadge } from "@/components/ds"
 import { getErrorMessage } from "@/lib/utils"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
+    DEFAULT_REMINDERS,
+    saveReminderPreferences,
     generateTelegramCode,
     getTelegramStatus,
     TELEGRAM_BOT_USERNAME,
@@ -52,7 +57,7 @@ export function TelegramSettings() {
             } catch (err) {
                 console.error(err)
                 toast.error(getErrorMessage(err, "Erro ao carregar o vínculo do Telegram"))
-                setStatus({ vinculado: false, username: null, vinculado_em: null })
+                setStatus({ vinculado: false, username: null, vinculado_em: null, ...DEFAULT_REMINDERS })
             }
         }
         load()
@@ -98,13 +103,27 @@ export function TelegramSettings() {
         try {
             setBusy(true)
             await unlinkTelegram()
-            setStatus({ vinculado: false, username: null, vinculado_em: null })
+            setStatus({ vinculado: false, username: null, vinculado_em: null, ...DEFAULT_REMINDERS })
             toast.success("Telegram desvinculado")
         } catch (err) {
             console.error(err)
             toast.error(getErrorMessage(err, "Erro ao desvincular"))
         } finally {
             setBusy(false)
+        }
+    }
+
+    const handlePreferences = async (patch: Partial<Pick<TelegramLinkStatus, "lembretes_ativos" | "lembrete_hora" | "resumo_semanal">>) => {
+        if (!status) return
+        const next = { ...status, ...patch }
+        setStatus(next)
+        try {
+            await saveReminderPreferences(next)
+            toast.success("Preferências de lembretes salvas")
+        } catch (err) {
+            console.error(err)
+            setStatus(status)
+            toast.error(getErrorMessage(err, "Erro ao salvar preferências"))
         }
     }
 
@@ -204,6 +223,47 @@ export function TelegramSettings() {
                     </div>
                 )}
             </SectionCard>
+
+            {status?.vinculado && (
+                <SectionCard
+                    title="Lembretes no Telegram"
+                    description="Uma mensagem por dia, só quando houver algo: contas vencendo ou atrasadas, faturas, assinaturas no cartão e orçamentos."
+                >
+                    <div className="space-y-4">
+                        <label className="flex items-center gap-3 text-sm">
+                            <Checkbox
+                                checked={status.lembretes_ativos}
+                                onCheckedChange={v => handlePreferences({ lembretes_ativos: v === true })}
+                            />
+                            Enviar lembretes diários
+                        </label>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <Label htmlFor="lembrete-hora" className="text-sm font-normal">Horário (Brasília)</Label>
+                            <Select
+                                value={String(status.lembrete_hora)}
+                                onValueChange={v => handlePreferences({ lembrete_hora: Number(v) })}
+                                disabled={!status.lembretes_ativos}
+                            >
+                                <SelectTrigger id="lembrete-hora" className="w-28"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {Array.from({ length: 17 }, (_, i) => i + 6).map(h => (
+                                        <SelectItem key={h} value={String(h)}>{String(h).padStart(2, "0")}:00</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <label className="flex items-center gap-3 text-sm">
+                            <Checkbox
+                                checked={status.resumo_semanal}
+                                disabled={!status.lembretes_ativos}
+                                onCheckedChange={v => handlePreferences({ resumo_semanal: v === true })}
+                            />
+                            Resumo da semana às segundas-feiras
+                        </label>
+                        <p className="text-xs text-muted-foreground">Também dá para pausar pelo bot com /lembretes off.</p>
+                    </div>
+                </SectionCard>
+            )}
 
             <SectionCard title="O que mandar para o bot" description="Texto ou áudio de até 2 minutos. Sem conta citada, usa a conta padrão.">
                 <ul className="flex flex-wrap gap-2">

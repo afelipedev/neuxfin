@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatDateToISO } from '@/lib/utils'
+import { buildInstallments, type InstallmentBase } from '@/features/transactions/services/installments'
 import {
     computeProjectedBalance,
     fetchBalanceOverview,
@@ -46,8 +47,25 @@ export const addTransactionSchema = z.object({
     ),
     cartao_nome: z.string().nullish().describe(
         'Nome do cartão de crédito quando a DESPESA foi no cartão (ex.: "no cartão Nubank", "no crédito"). Compra no cartão entra na fatura; não use conta_nome junto.'
+    ),
+    parcelas: z.number().int().nullish().describe(
+        'Número de parcelas (2 a 48) quando o usuário disser "em 10x", "parcelado em 3". Nesse caso `valor` é o TOTAL da compra.'
     )
 })
+
+/** Insere uma transação ou, com parcelas, o parcelamento inteiro num único INSERT (atômico). */
+async function insertTransaction(supabase: SupabaseClient, row: InstallmentBase & Record<string, unknown>, parcelas?: number | null) {
+    const rows = parcelas && parcelas >= 2 ? buildInstallments(row, parcelas, crypto.randomUUID()) : [row]
+    const { data, error } = await supabase
+        .from('transacoes')
+        .insert(rows)
+        .select('id, descricao, valor, tipo_transacao, status, data_vencimento, parcela_atual, total_parcelas')
+    if (error) throw new Error(`Erro ao salvar: ${error.message}`)
+    const saved = data ?? []
+    return rows.length > 1
+        ? { transaction: saved[0], parcelas: rows.length, valor_parcela: Number(saved[saved.length - 1]?.valor ?? 0), ultima_parcela: saved[saved.length - 1]?.data_vencimento }
+        : { transaction: saved[0] }
+}
 
 // --- Core Logic (Dependency Injection) ---
 
@@ -234,26 +252,21 @@ export const addTransactionCore = async (
         const dataCompra = params.data_vencimento && DATE_RE.test(params.data_vencimento.slice(0, 10))
             ? params.data_vencimento.slice(0, 10)
             : todayISO()
-        const { data: saved, error } = await supabase
-            .from('transacoes')
-            .insert([{
-                usuario_id: user_id,
-                descricao: params.descricao,
-                valor: params.valor,
-                tipo: params.tipo ?? 'PF',
-                tipo_transacao: 'despesa',
-                categoria_id,
-                conta_id: null,
-                cartao_id: cartao.id,
-                status: 'pendente',
-                data_vencimento: dataCompra,
-                data_pagamento: null,
-                is_recorrente: false,
-            }])
-            .select('id, descricao, valor, tipo_transacao, status, data_vencimento')
-            .single()
-        if (error) throw new Error(`Erro ao salvar: ${error.message}`)
-        return { success: true, transaction: saved, cartao: cartao.nome, aviso: 'Compra no cartão: entra na fatura e só sai da conta quando a fatura for paga.' }
+        const saved = await insertTransaction(supabase, {
+            usuario_id: user_id,
+            descricao: params.descricao,
+            valor: params.valor,
+            tipo: params.tipo ?? 'PF',
+            tipo_transacao: 'despesa',
+            categoria_id,
+            conta_id: null,
+            cartao_id: cartao.id,
+            status: 'pendente',
+            data_vencimento: dataCompra,
+            data_pagamento: null,
+            is_recorrente: false,
+        }, params.parcelas)
+        return { success: true, ...saved, cartao: cartao.nome, aviso: 'Compra no cartão: entra na fatura e só sai da conta quando a fatura for paga.' }
     }
 
     const { data: contas, error: contasError } = await supabase
@@ -273,7 +286,7 @@ export const addTransactionCore = async (
         : todayISO()
     const pago = params.pago === true
 
-    const transaction = {
+    const saved = await insertTransaction(supabase, {
         usuario_id: user_id,
         descricao: params.descricao,
         valor: params.valor,
@@ -285,18 +298,11 @@ export const addTransactionCore = async (
         data_vencimento: data,
         data_pagamento: pago ? data : null,
         is_recorrente: false
-    }
+    }, params.parcelas)
 
-    const { data: saved, error } = await supabase
-        .from('transacoes')
-        .insert([transaction])
-        .select('id, descricao, valor, tipo_transacao, status, data_vencimento')
-        .single()
-
-    if (error) throw new Error(`Erro ao salvar: ${error.message}`)
     return {
         success: true,
-        transaction: saved,
+        ...saved,
         conta: conta?.nome ?? null,
         aviso: conta
             ? undefined

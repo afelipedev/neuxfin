@@ -61,6 +61,27 @@ async function handleCommand(admin: Admin, chatId: number, command: string, arg:
             await sendMessage(chatId, formatBalanceMessage(balance))
             return
         }
+        case 'lembretes': {
+            const arg2 = arg.toLowerCase()
+            if (arg2 === 'on' || arg2 === 'off') {
+                const { error } = await admin
+                    .from('telegram_vinculos')
+                    .update({ lembretes_ativos: arg2 === 'on' })
+                    .eq('usuario_id', userId)
+                    .eq('chat_id', chatId)
+                if (error) throw error
+            }
+            const { data: pref, error } = await admin
+                .from('telegram_vinculos')
+                .select('lembretes_ativos, lembrete_hora, resumo_semanal')
+                .eq('usuario_id', userId)
+                .single()
+            if (error) throw error
+            await sendMessage(chatId, pref.lembretes_ativos
+                ? `🔔 Lembretes ligados, todo dia às ${pref.lembrete_hora}h (horário de Brasília)${pref.resumo_semanal ? ', com resumo semanal às segundas' : ''}.\n\nPara pausar: /lembretes off. Horário e resumo em Configurações → Telegram.`
+                : '🔕 Lembretes pausados. Para ligar: /lembretes on.')
+            return
+        }
         case 'desvincular': {
             const { error } = await admin
                 .from('telegram_vinculos')
