@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatCurrency, formatDateToISO, parseLocalDate } from '@/lib/utils'
 import { fromCents, toCents, todayISO } from '@/features/bank-accounts/services/balances'
 import { type CardOverview, fetchCardsOverview } from '@/features/credit-cards/services/invoices'
+import { type BudgetProgress, fetchBudgetProgress } from '@/features/budgets/services/budgets'
 
 /**
  * Próximos vencimentos e alertas de saúde financeira do dashboard.
@@ -63,6 +64,8 @@ export function buildAlerts(input: {
     cofrinhosTotal: number
     mediaDespesasMensal: number
     saldoPrevistoFimMes?: number
+    /** Orçamentos do mês atual */
+    budgets?: BudgetProgress[]
 }): DashboardAlerts {
     const { today, openTxs, cards, cofrinhosTotal, mediaDespesasMensal } = input
     const alerts: HealthAlert[] = []
@@ -131,6 +134,22 @@ export function buildAlerts(input: {
         }
     }
 
+    for (const b of input.budgets ?? []) {
+        if (b.status === 'ok') continue
+        const nome = b.budget.categoria?.nome ?? 'categoria'
+        alerts.push({
+            id: `orcamento:${b.budget.id}`,
+            level: b.status === 'estourado' ? 'critico' : 'atencao',
+            titulo: b.status === 'estourado'
+                ? `Orçamento de ${nome} estourado`
+                : `Orçamento de ${nome} em ${Math.round(b.percentual * 100)}%`,
+            descricao: b.status === 'estourado'
+                ? `Gasto de ${formatCurrency(b.gasto)} para um limite de ${formatCurrency(b.limite)} (${formatCurrency(-b.restante)} acima).`
+                : `Restam ${formatCurrency(b.restante)} de ${formatCurrency(b.limite)} neste mês.`,
+            href: '/orcamentos'
+        })
+    }
+
     let reserva_meses: number | null = null
     if (mediaDespesasMensal > 0) {
         reserva_meses = Math.round((cofrinhosTotal / mediaDespesasMensal) * 10) / 10
@@ -170,7 +189,7 @@ export async function getDashboardAlerts(
     const inicioMedia = formatDateToISO(new Date(now.getFullYear(), now.getMonth() - 3, 1))
     const fimMedia = formatDateToISO(new Date(now.getFullYear(), now.getMonth(), 0))
 
-    const [openRes, cardsOverview, cofrinhosRes, despesasRes] = await Promise.all([
+    const [openRes, cardsOverview, cofrinhosRes, despesasRes, budgets] = await Promise.all([
         supabase
             .from('transacoes')
             .select('id, descricao, valor, data_vencimento, tipo_transacao')
@@ -187,7 +206,12 @@ export async function getDashboardAlerts(
             .eq('tipo_transacao', 'despesa')
             .gte('data_vencimento', inicioMedia)
             .lte('data_vencimento', fimMedia)
-            .limit(5000)
+            .limit(5000),
+        // Orçamento não pode derrubar os demais alertas
+        fetchBudgetProgress(supabase, now.getMonth() + 1, now.getFullYear()).catch(error => {
+            console.error('[alertas] orçamentos', error)
+            return [] as BudgetProgress[]
+        })
     ])
     if (openRes.error) throw openRes.error
     if (cofrinhosRes.error) throw cofrinhosRes.error
@@ -202,6 +226,7 @@ export async function getDashboardAlerts(
         cards: cardsOverview.cards,
         cofrinhosTotal,
         mediaDespesasMensal: fromCents(Math.round(totalDespesas / 3)),
-        saldoPrevistoFimMes: options.saldoPrevistoFimMes
+        saldoPrevistoFimMes: options.saldoPrevistoFimMes,
+        budgets
     })
 }

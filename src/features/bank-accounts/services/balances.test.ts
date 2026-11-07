@@ -9,6 +9,8 @@ import {
     effectiveDate,
     fromCents,
     invoicePaymentsToMovements,
+    adjustmentsToMovements,
+    reconciliationDelta,
     sumBalances,
     toCents,
     transfersToMovements,
@@ -153,5 +155,24 @@ describe('movimentos que não são receita/despesa', () => {
         expect(movs[0].descricao).toBe('Pagamento da fatura Nubank (11/2026)')
         expect(computeAccountBalance(1000, movs, '2026-11-08')).toBe(1000)
         expect(computeAccountBalance(1000, movs, '2026-11-09')).toBe(899.9)
+    })
+
+    it('ajuste de saldo soma ou subtrai com sinal, sem virar receita/despesa do mês', () => {
+        const movs = adjustmentsToMovements([
+            { id: 'a1', conta_id: 'acc', valor: -50.25, data: '2026-11-05', descricao: null },
+            { id: 'a2', conta_id: 'acc', valor: '10', data: '2026-11-06', descricao: 'Rendimento' },
+        ])
+        expect(movs.map(m => [m.tipo_transacao, m.valor, m.origem])).toEqual([['despesa', 50.25, 'ajuste'], ['receita', 10, 'ajuste']])
+        expect(movs[0].descricao).toBe('Ajuste de saldo')
+        expect(computeAccountBalance(1000, movs, '2026-11-05')).toBe(949.75)
+        expect(computeAccountBalance(1000, movs, '2026-11-06')).toBe(959.75)
+    })
+})
+
+describe('reconciliationDelta', () => {
+    it('diferença para bater com o banco, em centavos', () => {
+        expect(reconciliationDelta(1000, 950)).toBe(-50)
+        expect(reconciliationDelta(0.1 + 0.2, '0.30')).toBe(0)
+        expect(reconciliationDelta(-20, 15.5)).toBe(35.5)
     })
 })
